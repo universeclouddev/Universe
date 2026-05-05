@@ -5,35 +5,17 @@ plugins {
 
     // Apply the Application plugin to add support for building an executable JVM application.
     application
-    alias(libs.plugins.jib)
 }
 
-val git = project.extra["git"] as Map<*, *>
-val commitId = git["git.commit.id.abbrev"].toString()
-val commitIdFull = git["git.commit.id"].toString()
-val branchName = git["git.branch"].toString()
-
 dependencies {
-
+    compileOnly(project(":loader"))
+    compileOnly(libs.dependencyDownload)
 }
 
 application {
     mainClass = "gg.scala.universe.app.AppKt"
 }
 
-jib {
-
-
-    to {
-        image = "git.lunarlabs.dev/Scala/universe"
-        credHelper.helper = "wincred"
-        tags = setOf("dev", commitId, commitIdFull, branchName)
-    }
-    container {
-        creationTime = provider {
-            // Retrieve the 'git' extra property and cast it to a Map
-            val git = project.extra["git"] as Map<*, *>
-            git["git.commit.time"].toString()
-        }
-    }
+tasks.shadowJar {
+    archiveFileName = "app.jarinjar"
 }
