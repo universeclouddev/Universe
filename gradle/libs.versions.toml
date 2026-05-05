@@ -1,0 +1,20 @@
+# Version catalog is a central place for you to declare and version dependencies
+# https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
+# https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
+
+[versions]
+kotlin = "2.3.21"
+shadow = "9.4.1"
+jib = "3.5.3"
+gradle-git-properties = "2.5.7"
+
+[libraries]
+kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+
+# Libraries can be bundled together for easier import
+[bundles]
+
+[plugins]
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+jib = { id = "com.google.cloud.tools.jib", version.ref = "jib" }
+gitProperties = { id = "com.gorylenko.gradle-git-properties", version.ref = "gradle-git-properties" }

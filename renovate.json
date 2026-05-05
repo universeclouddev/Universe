@@ -1,0 +1,29 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices"
+  ],
+  "automerge": true,
+  "automergeType": "pr",
+  "rebaseWhen": "auto",
+  "constraints": {
+    "java": "25"
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ],
+  "postUpgradeTasks": {
+    "commands": [
+      "./gradlew dependencies --write-locks --no-daemon"
+    ],
+    "fileFilters": ["**/*.kt", "**/*.kts", "**/gradle.lockfile", "**/*.java", "**/build.gradle.kts"],
+    "executionMode": "update"
+  }
+}
