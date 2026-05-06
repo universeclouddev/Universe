@@ -3,14 +3,12 @@ import dev.vankka.dependencydownload.path.DirectoryDependencyPathProvider
 import dev.vankka.dependencydownload.repository.MavenRepository
 import dev.vankka.dependencydownload.resource.DependencyDownloadResource
 import java.net.URL
+import java.net.URLClassLoader
 import java.nio.file.Paths
 import java.util.concurrent.Executors
 
 object DependencyLoader {
     private val EXECUTOR = Executors.newCachedThreadPool()
-    private val MANAGER = DependencyManager(
-        DirectoryDependencyPathProvider(Paths.get("./librairies"))
-    )
     private val REPOSITORIES = mutableListOf(
         "https://maven-central-eu.storage-download.googleapis.com/maven2/",
         "https://maven-central.storage-download.googleapis.com/maven2/",
@@ -18,7 +16,9 @@ object DependencyLoader {
         "https://repo.mincats.eu/mirrors",
         "https://jitpack.io",
     )
-    private val APPENDER = Appender(Thread.currentThread(), Any())
+
+    private var MAIN_THREAD = Thread.currentThread()
+    private val APPENDER = Appender(MAIN_THREAD, Any())
 
     fun addRepository(repo: String) {
         REPOSITORIES.add(repo)
@@ -34,12 +34,27 @@ object DependencyLoader {
         processDependencies(resource)
     }
 
+    private fun manager() = DependencyManager(
+        DirectoryDependencyPathProvider(Paths.get("./libraries"))
+    )
+
+    fun classLoader(): URLClassLoader {
+        if (this.MAIN_THREAD.contextClassLoader is URLClassLoader) {
+            return this.MAIN_THREAD.contextClassLoader as URLClassLoader
+        }
+
+        val newLoader = URLClassLoader(arrayOf(), MAIN_THREAD.contextClassLoader)
+        MAIN_THREAD.contextClassLoader = newLoader
+        return newLoader
+    }
+
     private fun processDependencies(resource: DependencyDownloadResource) {
-        MANAGER.loadResource(resource)
+        val manager = manager()
+        manager.loadResource(resource)
         val repos = REPOSITORIES.map { MavenRepository(it) }
 
-        MANAGER.downloadAll(EXECUTOR, repos).join()
-        MANAGER.relocateAll(EXECUTOR).join()
-        MANAGER.loadAll(EXECUTOR, APPENDER).join()
+        manager.downloadAll(EXECUTOR, repos).join()
+        manager.relocateAll(EXECUTOR).join()
+        manager.loadAll(EXECUTOR, APPENDER).join()
     }
 }

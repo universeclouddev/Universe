@@ -17,16 +17,12 @@ fun main() {
 class Appender(val mainThread: Thread, val lock: Any) : ClasspathAppender {
     override fun appendFileToClasspath(path: Path) {
         synchronized(lock) {
-            if (mainThread.contextClassLoader !is URLClassLoader) {
-                val newLoader = URLClassLoader(arrayOf(path.toUri().toURL()), mainThread.contextClassLoader)
-                mainThread.contextClassLoader = newLoader
-                return
-            }
+            val classLoader = DependencyLoader.classLoader()
 
             try {
                 val method = URLClassLoader::class.java.getDeclaredMethod("addURL", URL::class.java)
                 method.isAccessible = true
-                method.invoke(mainThread.contextClassLoader, path.toUri().toURL())
+                method.invoke(classLoader, path.toUri().toURL())
 //                println(" - $path")
             } catch (e: Exception) {
                 println("Failed to append file to classpath: $path, ${e.message}")
@@ -37,7 +33,7 @@ class Appender(val mainThread: Thread, val lock: Any) : ClasspathAppender {
 
 class Loader {
     init {
-        val loader = Thread.currentThread().contextClassLoader
+        val loader = DependencyLoader.classLoader()
 
         try {
             // 1. Extract and process the jarinjar

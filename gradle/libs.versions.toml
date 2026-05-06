@@ -7,13 +7,35 @@ kotlin = "2.3.21"
 shadow = "9.4.1"
 jib = "3.5.3"
 gradle-git-properties = "2.5.7"
+guice = "7.0.0"
+cloud = "2.0.0"
+cloudConfirmation = "1.0.0-rc.1"
+guava = "33.6.0-jre"
 
 [libraries]
+# dependency download
 dependencyDownload = { module = "dev.vankka:dependencydownload-runtime", version = "2.0.0" }
+
+# kotlin
 kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+
+# google
+guice = { module = "com.google.inject:guice", version.ref = "guice" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+
+# cloud commands
+cloudConfirmationProcessor = { group = "org.incendo", name = "cloud-processors-confirmation", version.ref = "cloudConfirmation" }
+
+# cloud command api
+cloudCoreApi = { group = "org.incendo", name = "cloud-core", version.ref = "cloud" }
+cloudAnnotations = { group = "org.incendo", name = "cloud-annotations", version.ref = "cloud" }
+cloudKtAnnotations = { group = "org.incendo", name = "cloud-kotlin-coroutines-annotations", version.ref = "cloud" }
+cloudKtExtensions = { group = "org.incendo", name = "cloud-kotlin-extensions", version.ref = "cloud" }
 
 # Libraries can be bundled together for easier import
 [bundles]
+cloudCommands = ["cloudConfirmationProcessor"]
+cloudCommandsApi = ["cloudCoreApi", "cloudAnnotations", "cloudKtAnnotations", "cloudKtExtensions"]
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

@@ -1,5 +1,3 @@
-import dev.vankka.dependencydownload.task.GenerateDependencyDownloadResourceTask
-
 plugins {
     application
     alias(libs.plugins.jib)
@@ -55,5 +53,8 @@ jib {
             val git = project.extra["git"] as Map<*, *>
             git["git.commit.time"].toString()
         }
+        labels = mapOf(
+            "org.opencontainers.image.source" to "https://git.lunarlabs.dev/scala/universe"
+        )
     }
 }
