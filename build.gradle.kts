@@ -133,7 +133,7 @@ subprojects {
     configurations.compileOnly.get().extendsFrom(provided)
 
     // 1. Wrap the extraction and publishing in afterEvaluate
-    // This forces Gradle to wait until bukkit/build.gradle.kts has populated the dependencies
+    // This forces Gradle to wait until bukkit/build.gradle.kts.kts has populated the dependencies
     afterEvaluate {
         val providedDependencies = configurations["provided"].dependencies.mapNotNull { dep ->
             // Notice: dep.version != null is removed here so BOM dependencies (Fawe) aren't dropped!

@@ -54,7 +54,7 @@ object DependencyLoader {
         val repos = REPOSITORIES.map { MavenRepository(it) }
 
         manager.downloadAll(EXECUTOR, repos).join()
-        manager.relocateAll(EXECUTOR).join()
+//        manager.relocateAll(EXECUTOR).join()
         manager.loadAll(EXECUTOR, APPENDER).join()
     }
 }

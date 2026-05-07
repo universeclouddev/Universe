@@ -7,6 +7,9 @@ plugins {
 }
 
 dependencies {
+    // Api
+    implementation(project(":api"))
+
     // Dependency Loader
     compileOnly(project(":loader"))
     compileOnly(libs.dependencyDownload)
