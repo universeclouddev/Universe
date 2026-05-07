@@ -29,6 +29,10 @@ tasks {
     }
 }
 
+tasks.jib {
+    dependsOn(tasks.shadowJar)
+}
+
 jib {
     to {
         image = "git.lunarlabs.dev/scala/universe"
@@ -41,20 +45,41 @@ jib {
             setOf("dev", commitId, commitIdFull, branchName)
         })
 
-
         auth {
             username = System.getenv("REGISTRY_USER") ?: ""
             password = System.getenv("REGISTRY_PASS") ?: ""
         }
     }
     container {
+        entrypoint = listOf(
+            "java",
+            "--add-opens=java.base/java.time=ALL-UNNAMED",
+            "--add-opens=java.base/java.net=ALL-UNNAMED",
+            "--enable-native-access=ALL-UNNAMED",
+            "-jar", "/app/universe.jar"
+        )
+
         creationTime = provider {
             // Retrieve the 'git' extra property and cast it to a Map
             val git = project.extra["git"] as Map<*, *>
             git["git.commit.time"].toString()
         }
+
+        workingDirectory = "/data"
+
         labels = mapOf(
             "org.opencontainers.image.source" to "https://git.lunarlabs.dev/scala/universe"
         )
+
+        // Tell Jib to copy the ShadowJar into the /app directory of the image
+        extraDirectories {
+            paths {
+                path {
+                    setFrom(tasks.shadowJar.get().archiveFile.get().asFile.parentFile)
+                    into = "/app"
+                    includes = listOf(tasks.shadowJar.get().archiveFileName.get())
+                }
+            }
+        }
     }
 }

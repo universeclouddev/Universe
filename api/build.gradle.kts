@@ -1,3 +1,3 @@
 dependencies {
-    api(libs.bundles.cloudCommands)
+    provided(libs.bundles.cloudCommands)
 }

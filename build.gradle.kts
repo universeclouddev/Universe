@@ -16,7 +16,7 @@ plugins {
 
 allprojects {
     version = "0.0.1"
-    group = "gg.scala.universe"
+    group = ""
 
     repositories {
         mavenCentral()

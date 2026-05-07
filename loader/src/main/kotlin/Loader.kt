@@ -10,11 +10,14 @@ import java.util.jar.JarFile
 import java.util.stream.Collectors
 
 fun main() {
-    DependencyLoader.fromResource(Loader::class.java.getResource("dependencies.txt")!!)
+    val resourceUrl = Loader::class.java.getResource("dependencies.txt")
+        ?: error("Could not find dependencies.txt on the classpath! Check resource packaging.")
+
+    DependencyLoader.fromResource(resourceUrl)
     Loader()
 }
 
-class Appender(val mainThread: Thread, val lock: Any) : ClasspathAppender {
+internal class Appender(val mainThread: Thread, val lock: Any) : ClasspathAppender {
     override fun appendFileToClasspath(path: Path) {
         synchronized(lock) {
             val classLoader = DependencyLoader.classLoader()
@@ -31,7 +34,7 @@ class Appender(val mainThread: Thread, val lock: Any) : ClasspathAppender {
     }
 }
 
-class Loader {
+private class Loader {
     init {
         val loader = DependencyLoader.classLoader()
 

@@ -5,6 +5,7 @@ plugins {
 dependencies {
     // api
     implementation(project(":api"))
+    implementation(project(":extensions:extension-api"))
 
     // dependency Loader
     compileOnly(project(":loader"))
@@ -13,6 +14,7 @@ dependencies {
     // google
     runtimeDownload(libs.guava)
     runtimeDownload(libs.guice)
+    runtimeDownload(libs.gson)
 
     // pretty log
     runtimeDownload(libs.okio)
