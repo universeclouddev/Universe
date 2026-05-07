@@ -1,26 +1,26 @@
 plugins {
-    // Apply the shared build logic from a convention plugin.
-    // The shared code is located in `buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts`.
-    id("buildsrc.convention.kotlin-jvm")
-
     application
 }
 
 dependencies {
-    // Api
+    // api
     implementation(project(":api"))
 
-    // Dependency Loader
+    // dependency Loader
     compileOnly(project(":loader"))
     compileOnly(libs.dependencyDownload)
 
-    // Google
+    // google
     runtimeDownload(libs.guava)
     runtimeDownload(libs.guice)
 
-    // Cloud
+    // pretty log
+    runtimeDownload(libs.okio)
+    runtimeDownload(libs.kotlinx.datetime)
+    runtimeDownload(libs.bundles.prettyLog)
+
+    // cloud
     runtimeDownload(libs.bundles.cloudCommands)
-    runtimeDownload(libs.bundles.cloudCommandsApi)
 }
 
 application {

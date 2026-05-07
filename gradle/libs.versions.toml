@@ -11,6 +11,9 @@ guice = "7.0.0"
 cloud = "2.0.0"
 cloudConfirmation = "1.0.0-rc.1"
 guava = "33.6.0-jre"
+pretty-log = "2.0"
+kotlinx-datetime = "0.7.1-0.6.x-compat"
+okio = "3.17.0"
 
 [libraries]
 # dependency download
@@ -32,10 +35,18 @@ cloudAnnotations = { group = "org.incendo", name = "cloud-annotations", version.
 cloudKtAnnotations = { group = "org.incendo", name = "cloud-kotlin-coroutines-annotations", version.ref = "cloud" }
 cloudKtExtensions = { group = "org.incendo", name = "cloud-kotlin-extensions", version.ref = "cloud" }
 
+# pretty log
+prettylog-common = { module = "cz.lukynka:pretty-log-common", version.ref = "pretty-log" }
+prettylog-jvm = { module = "cz.lukynka:pretty-log-jvm", version.ref = "pretty-log" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+
+# squareup
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+
 # Libraries can be bundled together for easier import
 [bundles]
-cloudCommands = ["cloudConfirmationProcessor"]
-cloudCommandsApi = ["cloudCoreApi", "cloudAnnotations", "cloudKtAnnotations", "cloudKtExtensions"]
+cloudCommands = ["cloudConfirmationProcessor", "cloudCoreApi", "cloudAnnotations", "cloudKtAnnotations", "cloudKtExtensions"]
+prettyLog = ["prettylog-common", "prettylog-jvm"]
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

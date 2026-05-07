@@ -14,24 +14,16 @@ plugins {
     id("dev.vankka.dependencydownload.plugin") version "2.0.0" apply false
 }
 
-kotlin {
-    jvmToolchain(25)
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_23)
-    }
-}
-
 allprojects {
     version = "0.0.1"
     group = "gg.scala.universe"
 
     repositories {
         mavenCentral()
+        maven("https://repo.mincats.eu/mirrors/")
 
         configureScalaRepository()
         configureScalaRepository(dev = true)
-
-        maven("https://repo.mincats.eu/mirrors/")
     }
 }
 
@@ -44,8 +36,19 @@ subprojects {
     apply(plugin = rootProject.libs.plugins.gitProperties.get().pluginId)
     apply(plugin = "dev.vankka.dependencydownload.plugin")
 
+    // Apply the shared build logic from a convention plugin.
+    // The shared code is located in `buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts`.
+    apply(plugin = "buildsrc.convention.kotlin-jvm")
+
     dependencies {
         compileOnly(kotlin("stdlib"))
+    }
+
+    kotlin {
+        jvmToolchain(25)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_25)
+        }
     }
 
     configure<com.gorylenko.GitPropertiesPluginExtension> {
