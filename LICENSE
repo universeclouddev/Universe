@@ -1,0 +1,61 @@
+Copyright © 2026 LunarLabs LLC. All rights reserved.
+
+This repository, including all source code, architecture, assets,
+documentation, and related materials, is the sole and exclusive property
+of LunarLabs LLC, operating through its software division Scala Studios.
+
+The source code is publicly viewable for transparency, educational
+reference, portfolio demonstration, and limited private internal
+experimentation only.
+
+PERMITTED USE
+
+You may:
+
+- View and study the source code
+- Learn from implementation patterns and architecture
+- Modify the code for strictly private, non-commercial internal use
+- Reference portions of the code in independent original projects
+
+You must:
+- You must say this project is from LunarLabs in other words you must disclose the source of the project
+- You must disclose changes 
+- You must have the copy of the License and Copyright notice in your project
+
+PROHIBITED USE
+
+You may not, without prior written consent from LunarLabs LLC:
+
+- Resell this codebase or derivative works
+- Redistribute this repository in whole or in part
+- Claim authorship or ownership of the project
+- Remove copyright or attribution notices
+- Offer hosting, SaaS, or public deployments using this code
+- Represent modified versions as official releases
+
+DEPENDENCIES / SUPPORT DISCLAIMER
+
+This repository may rely on private dependencies, internal systems,
+proprietary tooling, or custom platform modifications not included here.
+
+No support, setup assistance, updates, warranties, or guarantees are
+provided.
+
+OWNERSHIP
+
+No rights, title, trademark rights, or intellectual property rights are
+transferred by access to this repository.
+
+All ownership remains exclusively with LunarLabs LLC.
+
+GOVERNING LAW
+
+This license shall be governed by the laws of the State of Montana,
+United States, without regard to conflict-of-law principles.
+
+Any disputes shall be resolved exclusively in courts located in Montana.
+
+ACCEPTANCE
+
+By accessing, downloading, copying, or using any portion of this
+repository, you agree to these terms.
