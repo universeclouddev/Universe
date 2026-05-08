@@ -35,14 +35,13 @@ tasks.jib {
 
 jib {
     to {
-        image = "git.lunarlabs.dev/scala/universe"
+        image = "git.lunarlabs.dev/scala/universe:dev"
         setTags(provider {
             val git = project.extra["git"] as Map<*, *>
-            val commitId = git["git.commit.id.abbrev"].toString()
-            val commitIdFull = git["git.commit.id"].toString()
+//            val commitIdFull = git["git.commit.id"].toString()
             val branchName = git["git.branch"].toString()
 
-            setOf("dev", commitId, commitIdFull, branchName)
+            setOf("dev", /* commitIdFull, */ branchName)
         })
 
         auth {
@@ -56,6 +55,12 @@ jib {
             "--add-opens=java.base/java.time=ALL-UNNAMED",
             "--add-opens=java.base/java.net=ALL-UNNAMED",
             "--enable-native-access=ALL-UNNAMED",
+            "--add-modules=java.se",
+            "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+            "--add-opens=java.management/sun.management=ALL-UNNAMED",
+            "--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED",
             "-jar", "/app/universe.jar"
         )
 

@@ -15,6 +15,7 @@ guava = "33.6.0-jre"
 pretty-log = "2.0"
 kotlinx-datetime = "0.8.0-0.6.x-compat"
 okio = "3.17.0"
+hazelcast = "5.6.0"
 
 [libraries]
 # dependency download
@@ -22,6 +23,9 @@ dependencyDownload = { module = "dev.vankka:dependencydownload-runtime", version
 
 # kotlin
 kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+
+# hazelcast
+hazelcast = { module = "com.hazelcast:hazelcast", version.ref = "hazelcast" }
 
 # google
 guice = { module = "com.google.inject:guice", version.ref = "guice" }

@@ -11,6 +11,9 @@ dependencies {
     compileOnly(project(":loader"))
     compileOnly(libs.dependencyDownload)
 
+    // hazelcast
+    runtimeDownload(libs.hazelcast)
+
     // google
     runtimeDownload(libs.guava)
     runtimeDownload(libs.guice)

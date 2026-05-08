@@ -1,6 +1,6 @@
 package gg.scala.universe.util.json.adapter
 
-import gg.scala.universe.util.json.annotation.Version
+import gg.scala.universe.util.json.Version
 import com.google.gson.*
 import com.google.gson.reflect.TypeToken
 import com.google.gson.stream.JsonReader
