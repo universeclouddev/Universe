@@ -1,10 +1,12 @@
-plugins {
-    application
-}
+//configurations.named("runtimeDownload") {
+//    exclude(group = "org.jetbrains.kotlin")
+//}
 
 dependencies {
     // api
-    implementation(project(":api"))
+    implementation(project(":api")) {
+        exclude(group = "org.jetbrains.kotlin")
+    }
     implementation(project(":extensions:extension-api"))
 
     // dependency Loader
@@ -20,16 +22,21 @@ dependencies {
     runtimeDownload(libs.gson)
 
     // pretty log
-    runtimeDownload(libs.okio)
-    runtimeDownload(libs.kotlinx.datetime)
-    runtimeDownload(libs.bundles.prettyLog)
+    runtimeDownload(libs.okio) {
+        exclude(group = "org.jetbrains.kotlin")
+    }
+    runtimeDownload(libs.kotlinx.datetime) {
+        exclude(group = "org.jetbrains.kotlin")
+    }
+    runtimeDownload(libs.bundles.prettyLog) {
+        exclude(group = "org.jetbrains.kotlin")
+    }
 
     // cloud
-    runtimeDownload(libs.bundles.cloudCommands)
-}
-
-application {
-    mainClass = "gg.scala.universe.app.AppKt"
+    runtimeDownload(libs.bundles.cloudCommands) {
+        exclude(group = "org.jetbrains.kotlin") // disable transitive kotlin
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect") // disable transitive kotlin reflect
+    }
 }
 
 tasks.shadowJar {

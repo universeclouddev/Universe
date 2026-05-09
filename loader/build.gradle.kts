@@ -14,6 +14,7 @@ dependencies {
     implementation("org.ow2.asm:asm-commons:9.9.1")
 
     implementation(kotlin("stdlib"))
+    implementation(kotlin("reflect"))
 }
 
 tasks {
@@ -61,6 +62,7 @@ jib {
             "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
             "--add-opens=java.management/sun.management=ALL-UNNAMED",
             "--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED",
+            "-Dterminal.jline=false", "-Dterminal.ansi=true",
             "-jar", "/app/universe.jar"
         )
 

@@ -7,6 +7,7 @@ import com.hazelcast.core.HazelcastInstance
 import cz.lukynka.prettylog.LogType
 import cz.lukynka.prettylog.log
 import gg.scala.universe.config.UniverseMainConfiguration
+import gg.scala.universe.extension.ExtensionService
 import gg.scala.universe.hz.HazelcastService
 import gg.scala.universe.hz.HzGuiceModule
 
@@ -20,6 +21,7 @@ class UniverseApplication {
 
     val injector: Injector
     val hzService: HazelcastService
+    val extensionService: ExtensionService
 
     init {
         instance = this
@@ -30,6 +32,13 @@ class UniverseApplication {
         hzService = HazelcastService()
         injector.injectMembers(hzService)
         hzService.start()
+
+        extensionService = ExtensionService()
+        injector.injectMembers(extensionService)
+        extensionService.installExtensions()
+
+
+        extensionService.loadExtensions()
     }
 
     companion object {

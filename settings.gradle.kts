@@ -20,7 +20,7 @@ rootProject.name = "universe"
 registerSubProjects(
     root = "extensions",
     prefix = "extension",
-    subProjects = arrayOf("api")
+    subProjects = arrayOf("api", "example")
 //    subProjects = arrayOf("api", "loader", "processor", "runtime"),
 )
 
