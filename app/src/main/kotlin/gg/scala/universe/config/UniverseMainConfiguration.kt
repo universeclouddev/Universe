@@ -11,4 +11,6 @@ data class UniverseMainConfiguration(
     val masterAddress: String = "127.0.0.1",
     val masterPort: Int = 6000,
     val masterApiPort: Int = 7000,
+
+    val debug: Boolean = false
 )
