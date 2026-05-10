@@ -1,8 +1,8 @@
 package gg.scala.universe.docker
 
 data class DockerImageConfig(
-    val repository: String = "azul/zulu-openjdk",
-    val tag: String = "17-jre-headless",
+    val repository: String = "azul-zulu",
+    val tag: String = "25-jdk-alpine",
     val registry: String? = null,
     val platform: String? = null
 )
@@ -33,6 +33,17 @@ data class DockerConfig(
     val registryUrl: String? = null,
     val user: String? = null,
     val containerWorkDir: String = "/app",
-    val autoRemove: Boolean = true,
-    val stopTimeout: Int = 10
+    val autoRemove: Boolean = false,
+    val stopTimeout: Int = 10,
+    /**
+     * Host filesystem path that corresponds to the Universe data directory.
+     * Required when Universe itself runs inside a Docker container, because
+     * bind mounts in child containers are resolved by the Docker daemon on
+     * the host filesystem.
+     *
+     * Example: Universe container mounts `./data:/data` via docker-compose,
+     * and compose.yaml lives at `/opt/universe`. Then set:
+     * hostDataPath = "/opt/universe/data"
+     */
+    val hostDataPath: String? = null
 )

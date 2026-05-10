@@ -42,9 +42,13 @@ class DockerRuntimeProvider(
 
         val imageRef = buildImageRef(config.javaImage)
 
+        // Ensure image is available locally — pull if missing
+        ensureImageAvailable(imageRef)
+
         // Build port bindings
         val exposedPorts = mutableListOf<ExposedPort>()
         val portBindings = Ports()
+
 
         // Always bind the allocated port (maps host port to same container port)
         val allocatedExposed = ExposedPort.tcp(port)
@@ -64,7 +68,15 @@ class DockerRuntimeProvider(
 
         // Build volume binds
         val binds = mutableListOf<Bind>()
-        binds.add(Bind(workingDir.toAbsolutePath().toString(), Volume(config.containerWorkDir)))
+        val hostWorkingDir = if (config.hostDataPath != null) {
+            // Universe is running inside Docker — bind mounts are resolved on the host filesystem
+            workingDir.toAbsolutePath().normalize().toString().replaceFirst(
+                "/data", config.hostDataPath, ignoreCase = false
+            )
+        } else {
+            workingDir.toAbsolutePath().normalize().toString()
+        }
+        binds.add(Bind(hostWorkingDir, Volume(config.containerWorkDir)))
 
         config.volumes.forEach { vol ->
             binds.add(Bind(vol.hostPath, Volume(vol.containerPath), vol.readOnly))
@@ -100,6 +112,24 @@ class DockerRuntimeProvider(
 
         dockerClient.startContainerCmd(createResponse.id).exec()
         containerIds[instanceId] = createResponse.id
+
+        // Verify the container is actually running (not immediately exited)
+        Thread.sleep(1500) // brief grace period for container to start
+        val containerInfo = dockerClient.inspectContainerCmd(createResponse.id).exec()
+        if (containerInfo.state.running != true) {
+            val exitCode = containerInfo.state.exitCodeLong?.toInt() ?: -1
+            val logHint = if (config.autoRemove) {
+                "Set autoRemove=false in docker config to inspect the failed container."
+            } else {
+                "Check logs with: docker logs $containerName"
+            }
+            throw RuntimeException(
+                "Docker container '$containerName' exited immediately (code $exitCode). " +
+                "Command: $command. " +
+                "Common causes: missing jar, wrong working directory, or missing dependencies. " +
+                logHint
+            )
+        }
 
         log("Started Docker container '$containerName' (id=${createResponse.id}) for instance $instanceId on port $port", LogType.SUCCESS)
 
@@ -163,12 +193,59 @@ class DockerRuntimeProvider(
         }
     }
 
+    /**
+     * Checks if the image exists locally. If not, pulls it from the registry.
+     */
+    private fun ensureImageAvailable(imageRef: String) {
+        val exists = try {
+            val images = dockerClient.listImagesCmd().exec()
+            images.any { img ->
+                img.repoTags?.any { it == imageRef || it.startsWith("$imageRef:") } == true
+            }
+        } catch (_: Exception) {
+            false
+        }
+
+        if (exists) {
+            return
+        }
+
+        log("Image '$imageRef' not found locally, pulling...", LogType.INFORMATION)
+
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var pullError: Throwable? = null
+
+        dockerClient.pullImageCmd(imageRef)
+            .exec(object : com.github.dockerjava.api.async.ResultCallback.Adapter<com.github.dockerjava.api.model.PullResponseItem>() {
+                override fun onNext(item: com.github.dockerjava.api.model.PullResponseItem) {
+                    // Pull progress — silently ignore to avoid spam
+                }
+
+                override fun onError(throwable: Throwable) {
+                    pullError = throwable
+                    latch.countDown()
+                }
+
+                override fun onComplete() {
+                    latch.countDown()
+                }
+            })
+
+        latch.await()
+
+        if (pullError != null) {
+            throw RuntimeException("Failed to pull Docker image '$imageRef': ${pullError.message}", pullError)
+        }
+
+        log("Image '$imageRef' pulled successfully", LogType.SUCCESS)
+    }
+
     private fun createDockerClient(): DockerClient {
         val builder = DefaultDockerClientConfig.createDefaultConfigBuilder()
 
-        if (config.dockerHost != null) {
-            builder.withDockerHost(config.dockerHost)
-        }
+        val dockerHost = config.dockerHost ?: "unix:///var/run/docker.sock"
+        builder.withDockerHost(dockerHost)
+
         if (config.dockerCertPath != null) {
             builder.withDockerCertPath(config.dockerCertPath)
                 .withDockerTlsVerify(true)
