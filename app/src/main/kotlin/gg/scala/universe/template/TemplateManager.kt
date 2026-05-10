@@ -30,7 +30,8 @@ import kotlin.random.Random
 @Singleton
 class TemplateManager @Inject constructor(
     private val mainConfiguration: UniverseMainConfiguration,
-    private val variableRegistry: TemplateVariableRegistry
+    private val variableRegistry: TemplateVariableRegistry,
+    private val storageRegistry: TemplateStorageRegistry
 ) {
 
     private val templatesDir = Path.of("./templates")
@@ -67,6 +68,16 @@ class TemplateManager @Inject constructor(
         log("Installing ${sorted.size} template(s) for instance $instanceId (override=${config.onTemplatePasteOverridePresentFiles})", LogType.INFORMATION)
 
         sorted.forEach { template ->
+            if (template.storage != "local") {
+                val provider = storageRegistry.get(template.storage)
+                if (provider != null) {
+                    provider.downloadTemplate(template.group, template.name)
+                } else {
+                    log("No storage provider found for '${template.storage}', skipping template ${template.group}/${template.name}", LogType.WARNING)
+                    return@forEach
+                }
+            }
+
             val sourceDir = templatesDir.resolve(template.group).resolve(template.name)
             if (!sourceDir.exists() || !sourceDir.isDirectory()) {
                 log("Template directory not found: $sourceDir", LogType.WARNING)
@@ -92,6 +103,7 @@ class TemplateManager @Inject constructor(
 
         // allInGroups: include every template found in those group directories
         config.allInGroups.forEach { group ->
+            // Discover from local filesystem
             val groupDir = templatesDir.resolve(group)
             if (groupDir.exists() && groupDir.isDirectory()) {
                 Files.list(groupDir).use { stream ->
@@ -107,20 +119,27 @@ class TemplateManager @Inject constructor(
                         .forEach { selected.add(it) }
                 }
             }
+            // Discover from registered storage providers
+            storageRegistry.getAll().values.forEach { provider ->
+                provider.listTemplates(group).forEach { name ->
+                    selected.add(Template(name = name, group = group, storage = provider.storageKey, priority = 0))
+                }
+            }
         }
 
         // oneOf: pick exactly one from the list (highest priority wins, tiebreak random)
         if (config.oneOf.isNotEmpty()) {
-            val pick = config.oneOf.maxByOrNull { it.priority }
-                ?: config.oneOf.random()
+            val pick = config.oneOf.random()
             selected.add(pick)
         }
 
         // oneInGroups: pick one template from each group (highest priority wins, tiebreak random)
         config.oneInGroups.forEach { group ->
+            val candidates = mutableListOf<Template>()
+            // Local templates
             val groupDir = templatesDir.resolve(group)
             if (groupDir.exists() && groupDir.isDirectory()) {
-                val candidates = Files.list(groupDir).use { stream ->
+                Files.list(groupDir).use { stream ->
                     stream.filter { it.isDirectory() }
                         .map { dir ->
                             Template(
@@ -130,13 +149,18 @@ class TemplateManager @Inject constructor(
                                 priority = 0
                             )
                         }
-                        .toList()
+                        .forEach { candidates.add(it) }
                 }
-                if (candidates.isNotEmpty()) {
-                    val pick = candidates.maxByOrNull { it.priority }
-                        ?: candidates.random()
-                    selected.add(pick)
+            }
+            // Storage provider templates
+            storageRegistry.getAll().values.forEach { provider ->
+                provider.listTemplates(group).forEach { name ->
+                    candidates.add(Template(name = name, group = group, storage = provider.storageKey, priority = 0))
                 }
+            }
+            if (candidates.isNotEmpty()) {
+                val pick = candidates.random()
+                selected.add(pick)
             }
         }
 

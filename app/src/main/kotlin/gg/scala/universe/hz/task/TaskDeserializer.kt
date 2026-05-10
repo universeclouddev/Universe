@@ -4,6 +4,7 @@ import com.google.gson.JsonParser
 import gg.scala.universe.task.DeployInstanceTask
 import gg.scala.universe.task.ExecuteCommandTask
 import gg.scala.universe.task.StopInstanceTask
+import gg.scala.universe.task.TemplateSyncTask
 import gg.scala.universe.task.UniverseTask
 import gg.scala.universe.util.json.Serializers
 
@@ -17,6 +18,7 @@ object TaskDeserializer {
             "deploy" -> Serializers.GSON.fromJson(payload, DeployInstanceTask::class.java)
             "stop" -> Serializers.GSON.fromJson(payload, StopInstanceTask::class.java)
             "execute" -> Serializers.GSON.fromJson(payload, ExecuteCommandTask::class.java)
+            "template_sync" -> Serializers.GSON.fromJson(payload, TemplateSyncTask::class.java)
             else -> error("Unknown task type: $type")
         }
     }

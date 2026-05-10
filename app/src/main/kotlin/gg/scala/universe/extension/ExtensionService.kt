@@ -5,14 +5,11 @@ import com.google.inject.Inject
 import cz.lukynka.prettylog.LogType
 import cz.lukynka.prettylog.log
 import gg.scala.universe.app.UniverseApplication
-import gg.scala.universe.template.TemplateVariableProvider
-import gg.scala.universe.template.TemplateVariableRegistry
 import okio.Path.Companion.toPath
 
 class ExtensionService {
 
     @Inject private lateinit var app: UniverseApplication
-    @Inject private lateinit var variableRegistry: TemplateVariableRegistry
 
     private val extensionPath = "./extensions".toPath().toNioPath()
 
@@ -36,12 +33,6 @@ class ExtensionService {
         this.extensions.forEach { try {
             it.value.onLoad()
             this.loadedExtensions[it.key] = it.value
-
-            // Register template variable providers
-            if (it.value is TemplateVariableProvider) {
-                variableRegistry.register(it.value as TemplateVariableProvider)
-                log("Registered template variables from extension ${it.key}", LogType.INFORMATION)
-            }
         } catch (ex: Exception) {
             log("Failed to load extension ${it.key}: ${ex.message}", LogType.ERROR)
             log(ex)
@@ -65,6 +56,9 @@ class ExtensionService {
             log(ex)
         } }
     }
+
+    fun getLoadedExtensions(): Map<String, Extension> = loadedExtensions.toMap()
+    fun getInstalledExtensions(): Map<String, Extension> = extensions.toMap()
 
 }
 
