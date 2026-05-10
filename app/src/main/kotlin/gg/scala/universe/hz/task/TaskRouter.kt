@@ -13,7 +13,9 @@ import gg.scala.universe.task.ExecuteCommandTask
 import gg.scala.universe.task.StopInstanceTask
 import gg.scala.universe.task.UniverseTask
 import gg.scala.universe.template.TemplateManager
+import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.Comparator
 
 @Singleton
 class TaskRouter @Inject constructor(
@@ -42,7 +44,7 @@ class TaskRouter @Inject constructor(
         val allocatedPort = portAllocator.allocate(configuration.availablePorts)
             ?: return log("No available ports for instance ${task.instanceId} in range ${configuration.availablePorts.min}-${configuration.availablePorts.max}", LogType.ERROR)
 
-        val workingDir = Paths.get("./running/${task.instanceId}")
+        val workingDir = Paths.get("./running/${task.instanceId}").toAbsolutePath().normalize()
         workingDir.toFile().mkdirs()
 
         templateManager.installTemplates(
@@ -52,12 +54,34 @@ class TaskRouter @Inject constructor(
             targetDir = workingDir
         )
 
-        val processHandle = runtimeProvider.start(
-            instanceId = task.instanceId,
-            workingDir = workingDir,
-            port = allocatedPort,
-            command = configuration.command
-        )
+        val processHandle = try {
+            runtimeProvider.start(
+                instanceId = task.instanceId,
+                workingDir = workingDir,
+                port = allocatedPort,
+                command = configuration.command
+            )
+        } catch (e: Exception) {
+            val cause = e.cause ?: e
+            val reason = "${cause.javaClass.simpleName}: ${cause.message ?: "no details"}"
+            log("Failed to start instance ${task.instanceId}: $reason", LogType.ERROR)
+
+            // Clean up: remove instance record and working directory
+            clusterStateService.removeInstance(task.instanceId)
+            try {
+                if (Files.exists(workingDir)) {
+                    Files.walk(workingDir)
+                        .sorted(Comparator.reverseOrder())
+                        .forEach { Files.deleteIfExists(it) }
+                    log("Cleaned up working directory for instance ${task.instanceId}", LogType.INFORMATION)
+                }
+            } catch (cleanupEx: Exception) {
+                log("Failed to clean up working directory for instance ${task.instanceId}: ${cleanupEx.message}", LogType.WARNING)
+            }
+
+            portAllocator.release(allocatedPort)
+            return
+        }
 
         // Update instance info in Hazelcast
         val existing = clusterStateService.getInstance(task.instanceId)
@@ -89,6 +113,20 @@ class TaskRouter @Inject constructor(
 
         runtimeProvider.stop(task.instanceId)
         portAllocator.release(instance.allocatedPort)
+
+        // Clean up working directory
+        val workingDir = Paths.get("./running/${task.instanceId}").toAbsolutePath().normalize()
+        try {
+            if (Files.exists(workingDir)) {
+                Files.walk(workingDir)
+                    .sorted(Comparator.reverseOrder())
+                    .forEach { Files.deleteIfExists(it) }
+                log("Cleaned up working directory for instance ${task.instanceId}", LogType.INFORMATION)
+            }
+        } catch (cleanupEx: Exception) {
+            log("Failed to clean up working directory for instance ${task.instanceId}: ${cleanupEx.message}", LogType.WARNING)
+        }
+
         clusterStateService.updateInstanceState(task.instanceId, InstanceState.STOPPED)
         log("Instance ${task.instanceId} stopped", LogType.INFORMATION)
     }

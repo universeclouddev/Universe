@@ -12,6 +12,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import kotlin.io.path.copyTo
+import kotlin.io.path.createDirectories
+import kotlin.io.path.createDirectory
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.name
@@ -35,6 +37,13 @@ class TemplateManager @Inject constructor(
 ) {
 
     private val templatesDir = Path.of("./templates")
+
+    init {
+        if (!Files.exists(templatesDir)) {
+            templatesDir.createDirectories()
+            templatesDir.resolve("default/server").createDirectories()
+        }
+    }
 
     /**
      * Installs all applicable templates for the given [configuration] into [targetDir].
