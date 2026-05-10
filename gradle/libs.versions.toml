@@ -67,7 +67,12 @@ ktor-server-host-common = { module = "io.ktor:ktor-server-host-common", version.
 [bundles]
 cloudCommands = ["cloudConfirmationProcessor", "cloudCoreApi", "cloudAnnotations", "cloudKtAnnotations", "cloudKtExtensions"]
 prettyLog = ["prettylog-common", "prettylog-jvm"]
-ktor = ["ktor-server-core", "ktor-server-netty", "ktor-server-content-negotiation", "ktor-server-auth", "ktor-server-cors", "ktor-server-status-pages", "ktor-server-call-logging", "ktor-server-host-common"]
+ktor = [
+    "ktor-server-core", "ktor-server-netty",
+    "ktor-server-content-negotiation", "ktor-server-auth",
+    "ktor-server-cors", "ktor-server-status-pages",
+    "ktor-server-call-logging", "ktor-server-host-common"
+]
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

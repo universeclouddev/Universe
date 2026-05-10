@@ -58,8 +58,42 @@ This document defines the roles, system boundaries, and handoff protocols for th
 - The Wrapper runs from the **same fat JAR** as the Master. It checks `UniverseMainConfiguration.isMasterNode`.
 - The Wrapper does **not** start a Ktor server. It acts purely as a Hazelcast `IExecutorService` consumer.
 - Guice modules bind regardless of node type. Unused Master-only services may bind to `null` or no-op implementations.
+- **The Master also acts as a Wrapper.** When `isMasterNode = true`, the node starts the Ktor REST API **and** consumes `IExecutorService` tasks. It can host instances locally just like any other Wrapper node.
 
 ## Minecraft Plugin Projects
 - External Bukkit/Paper plugins live under:
   - `/minecraft/modern` — targets Minecraft 1.21.4+
   - `/minecraft/legacy` — targets Minecraft 1.8.8
+
+## Reference Libraries & Inspirations
+
+### PrettyLog
+- **Repository:** https://github.com/LukynkaCZE/PrettyLog
+- **Description:** Kotlin logging library focused on readability in console using ANSI color codes.
+- **Usage in Universe:** All logging throughout the project uses `cz.lukynka.prettylog.log()` with `LogType` enum values (e.g., `LogType.INFORMATION`, `LogType.WARNING`, `LogType.NETWORK`, `LogType.ERROR`).
+- **Key API:** `log(message, type)`, `PrettyLogSettings.saveToFile`, custom `LogType` instances with `LogStyle` and prefixes.
+
+### Cloud Command Framework (Incendo)
+- **Repository:** https://github.com/Incendo/cloud
+- **Documentation:** https://cloud.incendo.org
+- **Description:** JVM command dispatcher & framework supporting builder and annotation-based command definitions. Cloud v2 is the current major version.
+- **Usage in Universe:** Console command handling is built on Cloud v2 (`org.incendo.cloud`). The project already includes `cloud-core`, `cloud-annotations`, `cloud-kotlin-coroutines-annotations`, and `cloud-kotlin-extensions` in the `cloudCommands` bundle.
+- **Key API:** `CommandManager<CommandSource>`, `@Command` annotations, `ExecutionCoordinator`, `CommandRegistrationHandler`.
+- **Current Status:** `DefaultCommandManager.kt` implements `CommandManager<CommandSource>` but is commented out (`//@Singleton`). The command system was started but not fully wired into the application bootstrap.
+
+### CloudNet
+- **Repository:** https://github.com/CloudNetService/CloudNet
+- **Description:** A modern application that dynamically delivers Minecraft-oriented software. The primary architectural inspiration for Universe.
+- **Inspiration Points:**
+  - Master/Wrapper node architecture with cluster communication
+  - Template-based instance deployment
+  - Console command system structure (the `.java` command files in `/commands` are adapted from CloudNet)
+  - `driver`/`node`/`wrapper` module separation patterns
+
+### SimpleCloud
+- **Organization:** https://github.com/simplecloudapp
+- **Description:** Another Minecraft cloud orchestrator providing inspiration for the Universe project.
+- **Inspiration Points:**
+  - Controller / droplet architecture
+  - Plugin ecosystem design
+  - Server group and instance management patterns
