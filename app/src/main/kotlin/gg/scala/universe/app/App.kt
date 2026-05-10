@@ -5,6 +5,7 @@ import com.google.inject.Injector
 import com.google.inject.Module
 import com.hazelcast.core.HazelcastInstance
 import cz.lukynka.prettylog.LogType
+import cz.lukynka.prettylog.PrettyLogSettings
 import cz.lukynka.prettylog.log
 import gg.scala.universe.api.ApiGuiceModule
 import gg.scala.universe.api.KtorServerService
@@ -18,6 +19,7 @@ import gg.scala.universe.hz.HzGuiceModule
 import gg.scala.universe.hz.ResilienceMembershipListener
 import gg.scala.universe.command.CommandBootstrap
 import gg.scala.universe.runtime.RuntimeRegistry
+import gg.scala.universe.runtime.ProcessRuntimeProvider
 import gg.scala.universe.runtime.ScreenRuntimeProvider
 import gg.scala.universe.runtime.TmuxRuntimeProvider
 
@@ -38,6 +40,14 @@ class UniverseApplication {
         instance = this
         mainConfiguration = ConfigLoader.load()
 
+        if (!mainConfiguration.debug) {
+            PrettyLogSettings.disabledLogTypes = setOf(LogType.DEBUG, LogType.TRACE, LogType.CONFIG)
+        }
+
+        PrettyLogSettings.saveToFile = true
+        PrettyLogSettings.saveDirectoryPath = "./logs/"
+        PrettyLogSettings.logFileNameFormat = "yyyy-MM-dd-Hms"
+
         injector = Guice.createInjector(guiceModules)
 
         hzService = HazelcastService()
@@ -48,7 +58,8 @@ class UniverseApplication {
         val runtimeRegistry = injector.getInstance(RuntimeRegistry::class.java)
         runtimeRegistry.register("tmux", TmuxRuntimeProvider())
         runtimeRegistry.register("screen", ScreenRuntimeProvider())
-        log("Registered built-in runtime providers (tmux, screen)", LogType.INFORMATION)
+        runtimeRegistry.register("process", ProcessRuntimeProvider())
+        log("Registered built-in runtime providers (tmux, screen, process)", LogType.INFORMATION)
 
         if (mainConfiguration.isMasterNode) {
             val clusterStateService = injector.getInstance(ClusterStateService::class.java)

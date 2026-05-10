@@ -1,0 +1,59 @@
+package gg.scala.universe.runtime
+
+import com.google.inject.Singleton
+import cz.lukynka.prettylog.LogType
+import cz.lukynka.prettylog.log
+import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * [RuntimeProvider] that runs the instance command directly as a subprocess.
+ *
+ * This is the preferred runtime for Docker containers where screen/tmux
+ * are not available. Stdout and stderr are redirected to log files in
+ * the instance working directory.
+ */
+@Singleton
+class ProcessRuntimeProvider : RuntimeProvider {
+
+    private val processes = ConcurrentHashMap<String, Process>()
+
+    override fun start(instanceId: String, workingDir: Path, port: Int, command: String): ProcessHandle {
+        if (command.isBlank()) {
+            throw IllegalArgumentException("Command is blank for instance $instanceId")
+        }
+
+        val logOut = workingDir.resolve("stdout.log").toFile()
+        val logErr = workingDir.resolve("stderr.log").toFile()
+
+        val process = ProcessBuilder("bash", "-c", command)
+            .directory(workingDir.toFile())
+            .redirectOutput(ProcessBuilder.Redirect.to(logOut))
+            .redirectError(ProcessBuilder.Redirect.to(logErr))
+            .redirectInput(ProcessBuilder.Redirect.PIPE)
+            .start()
+
+        processes[instanceId] = process
+
+        log("Started process for instance $instanceId (PID ${process.pid()})", LogType.SUCCESS)
+        return process.toHandle()
+    }
+
+    override fun stop(instanceId: String) {
+        val process = processes.remove(instanceId) ?: return
+        process.destroy()
+        log("Stopped process for instance $instanceId", LogType.INFORMATION)
+    }
+
+    override fun executeCommand(instanceId: String, command: String) {
+        val process = processes[instanceId]
+            ?: return log("No process found for instance $instanceId", LogType.WARNING)
+
+        process.outputStream.bufferedWriter().use {
+            it.write(command)
+            it.newLine()
+            it.flush()
+        }
+        log("Executed command on instance $instanceId: $command", LogType.INFORMATION)
+    }
+}
