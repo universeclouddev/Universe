@@ -16,6 +16,9 @@ import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.HazelcastService
 import gg.scala.universe.hz.HzGuiceModule
 import gg.scala.universe.hz.ResilienceMembershipListener
+import gg.scala.universe.runtime.RuntimeRegistry
+import gg.scala.universe.runtime.ScreenRuntimeProvider
+import gg.scala.universe.runtime.TmuxRuntimeProvider
 
 fun run() {
     log("Starting Universe", LogType.INFORMATION)
@@ -38,6 +41,12 @@ class UniverseApplication {
         hzService = HazelcastService()
         injector.injectMembers(hzService)
         hzService.start()
+
+        // Register built-in runtime providers
+        val runtimeRegistry = injector.getInstance(RuntimeRegistry::class.java)
+        runtimeRegistry.register("tmux", TmuxRuntimeProvider())
+        runtimeRegistry.register("screen", ScreenRuntimeProvider())
+        log("Registered built-in runtime providers (tmux, screen)", LogType.INFORMATION)
 
         if (mainConfiguration.isMasterNode) {
             val clusterStateService = injector.getInstance(ClusterStateService::class.java)

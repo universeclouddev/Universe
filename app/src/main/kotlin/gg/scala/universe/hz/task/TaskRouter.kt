@@ -5,19 +5,20 @@ import com.google.inject.Singleton
 import cz.lukynka.prettylog.LogType
 import cz.lukynka.prettylog.log
 import gg.scala.universe.hz.ClusterStateService
+import gg.scala.universe.runtime.PortAllocator
 import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.schema.InstanceState
 import gg.scala.universe.task.DeployInstanceTask
 import gg.scala.universe.task.ExecuteCommandTask
 import gg.scala.universe.task.StopInstanceTask
 import gg.scala.universe.task.UniverseTask
-import java.nio.file.Path
 import java.nio.file.Paths
 
 @Singleton
 class TaskRouter @Inject constructor(
     private val runtimeRegistry: RuntimeRegistry,
-    private val clusterStateService: ClusterStateService
+    private val clusterStateService: ClusterStateService,
+    private val portAllocator: PortAllocator
 ) {
     fun route(task: UniverseTask) {
         when (task) {
@@ -36,8 +37,8 @@ class TaskRouter @Inject constructor(
         val runtimeProvider = runtimeRegistry.get(configuration.runtime)
             ?: return log("Runtime '${configuration.runtime}' not registered for instance ${task.instanceId}", LogType.ERROR)
 
-        // Placeholder: port allocation will be implemented in Phase 3
-        val allocatedPort = 0
+        val allocatedPort = portAllocator.allocate(configuration.availablePorts)
+            ?: return log("No available ports for instance ${task.instanceId} in range ${configuration.availablePorts.min}-${configuration.availablePorts.max}", LogType.ERROR)
 
         val workingDir = Paths.get("./running/${task.instanceId}")
         workingDir.toFile().mkdirs()
@@ -70,11 +71,15 @@ class TaskRouter @Inject constructor(
         val instance = clusterStateService.getInstance(task.instanceId)
             ?: return log("Instance ${task.instanceId} not found", LogType.WARNING)
 
-        val runtimeProvider = runtimeRegistry.get(instance.configurationName)
+        val configuration = clusterStateService.getConfiguration(instance.configurationName)
+        val runtimeKey = configuration?.runtime ?: instance.configurationName
+
+        val runtimeProvider = runtimeRegistry.get(runtimeKey)
             ?: runtimeRegistry.getAll().values.firstOrNull()
             ?: return log("No runtime provider available to stop instance ${task.instanceId}", LogType.ERROR)
 
         runtimeProvider.stop(task.instanceId)
+        portAllocator.release(instance.allocatedPort)
         clusterStateService.updateInstanceState(task.instanceId, InstanceState.STOPPED)
         log("Instance ${task.instanceId} stopped", LogType.INFORMATION)
     }
@@ -85,7 +90,10 @@ class TaskRouter @Inject constructor(
         val instance = clusterStateService.getInstance(task.instanceId)
             ?: return log("Instance ${task.instanceId} not found", LogType.WARNING)
 
-        val runtimeProvider = runtimeRegistry.get(instance.configurationName)
+        val configuration = clusterStateService.getConfiguration(instance.configurationName)
+        val runtimeKey = configuration?.runtime ?: instance.configurationName
+
+        val runtimeProvider = runtimeRegistry.get(runtimeKey)
             ?: runtimeRegistry.getAll().values.firstOrNull()
             ?: return log("No runtime provider available to execute command on instance ${task.instanceId}", LogType.ERROR)
 
