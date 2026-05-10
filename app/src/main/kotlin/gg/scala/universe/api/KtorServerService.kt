@@ -16,7 +16,10 @@ import io.ktor.server.application.Application
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
+import io.netty.util.internal.logging.InternalLoggerFactory
+import io.netty.util.internal.logging.JdkLoggerFactory
 import java.util.concurrent.TimeUnit
+import java.util.logging.Level
 
 class KtorServerService @Inject constructor(
     private val configuration: UniverseMainConfiguration,
@@ -31,6 +34,11 @@ class KtorServerService @Inject constructor(
             log("Not a master node, skipping Ktor server startup", LogType.INFORMATION)
             return
         }
+
+        // Redirect Netty internal logging away from SLF4J/PrettyLog to JDK logging,
+        // then suppress Netty's noisy debug capability-check spam.
+        InternalLoggerFactory.setDefaultFactory(JdkLoggerFactory.INSTANCE)
+        java.util.logging.Logger.getLogger("io.netty").level = Level.WARNING
 
         log("Starting Ktor REST API on ${configuration.address}:${configuration.apiPort}...", LogType.INFORMATION)
 

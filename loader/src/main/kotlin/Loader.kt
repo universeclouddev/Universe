@@ -10,6 +10,10 @@ import java.util.jar.JarFile
 import java.util.stream.Collectors
 
 fun main() {
+    // Disable Netty native OpenSSL to avoid PrettyLog null-throwable incompatibility
+    // in OpenSslX509TrustManagerWrapper logger.debug(msg, null) calls on Java 25.
+    System.setProperty("io.netty.handler.ssl.noOpenSsl", "true")
+
     val resourceUrl = Loader::class.java.getResource("dependencies.txt")
         ?: error("Could not find dependencies.txt on the classpath! Check resource packaging.")
 

@@ -60,16 +60,39 @@ class ExtensionService {
 }
 
 object ExtensionClassUtils {
+
+    /**
+     * Known third-party dependency packages that should not be scanned for extensions.
+     * Prevents noisy static-init logs (e.g. Netty capability checks) and improves startup time.
+     */
+    private val EXCLUDED_PREFIXES = listOf(
+        "io.netty.", "io.ktor.", "io.github.", "io.micrometer.",
+        "kotlin.", "kotlinx.",
+        "java.", "javax.", "sun.", "com.sun.", "jdk.",
+        "com.google.", "com.hazelcast.", "com.fasterxml.",
+        "org.jetbrains.", "org.intellij.", "org.apache.", "org.slf4j.", "org.json.",
+        "okio.", "dev.vankka.", "cz.lukynka."
+    )
+
     fun extensions(): List<Extension> {
         val classPath = ClassPath.from(DependencyLoader.classLoader())
 
         return classPath.allClasses.asSequence()
             .map { it.name }
-            .mapNotNull { if (it.startsWith("META-INF")) null else try {
-                Class.forName(it)
+            .filter { name ->
+                !name.startsWith("META-INF") && EXCLUDED_PREFIXES.none { name.startsWith(it) }
+            }
+            .mapNotNull { try {
+                // initialize = false prevents triggering static initializers of third-party classes
+                // (e.g. Netty capability checks) during the scan phase.
+                Class.forName(it, false, DependencyLoader.classLoader())
             } catch (_: ClassNotFoundException) {
                 null
             } catch (_: NoClassDefFoundError) {
+                null
+            } catch (_: ExceptionInInitializerError) {
+                null
+            } catch (_: LinkageError) {
                 null
             } }
             .mapNotNull { clazz -> if (Extension::class.java.isAssignableFrom(clazz)) try {
