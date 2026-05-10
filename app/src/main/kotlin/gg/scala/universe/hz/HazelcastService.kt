@@ -45,6 +45,9 @@ class HazelcastService {
             log("📡 Starting Deployer in WRAPPER mode, connecting to Master at $masterAddress...", LogType.INFORMATION)
         }
 
+        // Set node ID as a member attribute so it can be read by other members
+        hzConfig.memberAttributeConfig.setAttribute("nodeId", configuration.nodeId)
+
         this.hzInstance = Hazelcast.newHazelcastInstance(hzConfig)
     }
 }

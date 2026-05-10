@@ -4,6 +4,7 @@ import com.google.inject.Inject
 import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.cluster.Member
 import cz.lukynka.prettylog.LogType
+import gg.scala.universe.hz.nodeName
 import cz.lukynka.prettylog.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.schema.InstanceInfo
@@ -21,7 +22,7 @@ class TaskDispatcher @Inject constructor(
     }
 
     fun dispatchDeploy(instanceInfo: InstanceInfo, targetMember: Member) {
-        log("Dispatching deploy task for instance ${instanceInfo.id} to member ${targetMember.uuid}", LogType.INFORMATION)
+        log("Dispatching deploy task for instance ${instanceInfo.id} to node ${targetMember.nodeName()}", LogType.INFORMATION)
         val task = DeployInstanceTask(
             instanceId = instanceInfo.id,
             configurationName = instanceInfo.configurationName
@@ -30,13 +31,13 @@ class TaskDispatcher @Inject constructor(
     }
 
     fun dispatchStop(instanceId: String, targetMember: Member) {
-        log("Dispatching stop task for instance $instanceId to member ${targetMember.uuid}", LogType.INFORMATION)
+        log("Dispatching stop task for instance $instanceId to node ${targetMember.nodeName()}", LogType.INFORMATION)
         val task = StopInstanceTask(instanceId = instanceId)
         submit(task, targetMember)
     }
 
     fun dispatchExecute(instanceId: String, command: String, targetMember: Member) {
-        log("Dispatching execute task for instance $instanceId to member ${targetMember.uuid}: $command", LogType.INFORMATION)
+        log("Dispatching execute task for instance $instanceId to node ${targetMember.nodeName()}: $command", LogType.INFORMATION)
         val task = ExecuteCommandTask(
             instanceId = instanceId,
             command = command
