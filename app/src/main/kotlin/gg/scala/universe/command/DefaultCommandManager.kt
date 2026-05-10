@@ -18,12 +18,34 @@ package gg.scala.universe.command
 import com.google.inject.Inject
 import com.google.inject.Singleton
 import org.incendo.cloud.CloudCapability
+import org.incendo.cloud.Command
 import org.incendo.cloud.CommandManager
+import org.incendo.cloud.component.CommandComponent
 import org.incendo.cloud.execution.ExecutionCoordinator
 import org.incendo.cloud.internal.CommandRegistrationHandler
 import org.incendo.cloud.meta.CommandMeta
 import org.incendo.cloud.meta.SimpleCommandMeta
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
+
+/**
+ * In-memory command registration handler that stores commands for local execution.
+ */
+class UniverseCommandRegistrationHandler : CommandRegistrationHandler<CommandSource> {
+    private val commands = ConcurrentHashMap.newKeySet<Command<CommandSource>>()
+
+    override fun registerCommand(command: Command<CommandSource>): Boolean {
+        return commands.add(command)
+    }
+
+    override fun unregisterRootCommand(rootCommand: CommandComponent<CommandSource>) {
+        commands.removeIf { cmd ->
+            cmd.components().firstOrNull()?.name() == rootCommand.name()
+        }
+    }
+
+    fun getCommands(): Collection<Command<CommandSource>> = commands.toList()
+}
 
 /**
  * Constructs the default implementation of the [CommandManager]. Applying asynchronous command executing using
@@ -36,7 +58,7 @@ internal class DefaultCommandManager @Inject constructor(executor: ExecutorServi
             .parsingExecutor(executor)
             .executionSchedulingExecutor(executor)
             .build(),
-        CommandRegistrationHandler.nullCommandRegistrationHandler()
+        UniverseCommandRegistrationHandler()
     ) {
 
     init {
