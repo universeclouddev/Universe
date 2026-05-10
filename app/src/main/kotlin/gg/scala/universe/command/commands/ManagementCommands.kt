@@ -73,7 +73,7 @@ class ManagementCommands @Inject constructor(
 
     // ─── Instance Commands ───
 
-    @Command("instance list")
+    @Command("instance|instances list")
     fun instanceList(source: CommandSource) {
         val instances = clusterStateService.getAllInstances()
         if (instances.isEmpty()) {
@@ -97,10 +97,11 @@ class ManagementCommands @Inject constructor(
         }
     }
 
-    @Command("instance create <config>")
+    @Command("instance|instances create <config> <amount>")
     fun instanceCreate(
         source: CommandSource,
-        @Argument("config") configName: String
+        @Argument("config") configName: String,
+        @Argument("amount") amount: Int = 1
     ) {
         val configuration = clusterStateService.getConfiguration(configName)
         if (configuration == null) {
@@ -108,28 +109,30 @@ class ManagementCommands @Inject constructor(
             return
         }
 
-        val wrapperMember = hazelcastInstance.cluster.members.firstOrNull { !it.localMember() }
-            ?: hazelcastInstance.cluster.localMember
+        for (i in 1..amount) {
+            val wrapperMember = hazelcastInstance.cluster.members.firstOrNull { !it.localMember() }
+                ?: hazelcastInstance.cluster.localMember
 
-        val instanceId = generateInstanceId()
-        val instanceInfo = InstanceInfo(
-            id = instanceId,
-            configurationName = configuration.name,
-            wrapperNodeId = wrapperMember.uuid.toString(),
-            hostAddress = configuration.hostAddress,
-            allocatedPort = 0,
-            state = InstanceState.CREATING,
-            lastHeartbeat = System.currentTimeMillis(),
-            processPid = null
-        )
+            val instanceId = generateInstanceId()
+            val instanceInfo = InstanceInfo(
+                id = instanceId,
+                configurationName = configuration.name,
+                wrapperNodeId = wrapperMember.uuid.toString(),
+                hostAddress = configuration.hostAddress,
+                allocatedPort = 0,
+                state = InstanceState.CREATING,
+                lastHeartbeat = System.currentTimeMillis(),
+                processPid = null
+            )
 
-        clusterStateService.putInstance(instanceInfo)
-        taskDispatcher.dispatchDeploy(instanceInfo, wrapperMember)
+            clusterStateService.putInstance(instanceInfo)
+            taskDispatcher.dispatchDeploy(instanceInfo, wrapperMember)
 
-        source.sendMessage("Created instance $instanceId from configuration '$configName' on ${wrapperMember.uuid}")
+            source.sendMessage("Created instance $instanceId from configuration '$configName' on ${wrapperMember.uuid}")
+        }
     }
 
-    @Command("instance stop <id>")
+    @Command("instance|instances stop <id>")
     fun instanceStop(
         source: CommandSource,
         @Argument("id") instanceId: String
@@ -148,7 +151,7 @@ class ManagementCommands @Inject constructor(
         source.sendMessage("Stopping instance $instanceId...")
     }
 
-    @Command("instance info <id>")
+    @Command("instance|instances info <id>")
     fun instanceInfo(
         source: CommandSource,
         @Argument("id") instanceId: String
@@ -168,7 +171,7 @@ class ManagementCommands @Inject constructor(
         source.sendMessage("  Last heartbeat: ${instance.lastHeartbeat}")
     }
 
-    @Command("instance execute <id> <command>")
+    @Command("instance|instances execute <id> <command>")
     fun instanceExecute(
         source: CommandSource,
         @Argument("id") instanceId: String,
@@ -190,7 +193,7 @@ class ManagementCommands @Inject constructor(
 
     // ─── Configuration Commands ───
 
-    @Command("config list")
+    @Command("config|configs list")
     fun configList(source: CommandSource) {
         val configs = clusterStateService.configurations.values
         if (configs.isEmpty()) {
@@ -204,7 +207,7 @@ class ManagementCommands @Inject constructor(
         }
     }
 
-    @Command("config reload")
+    @Command("config|configs reload")
     fun configReload(source: CommandSource) {
         ConfigurationLoader.load(clusterStateService)
         source.sendMessage("Configurations reloaded from disk.")
@@ -212,7 +215,7 @@ class ManagementCommands @Inject constructor(
 
     // ─── Template Commands ───
 
-    @Command("template list")
+    @Command("template|templates list")
     fun templateList(source: CommandSource) {
         val templatesDir = Path.of("./templates")
         if (!templatesDir.exists() || !templatesDir.isDirectory()) {
@@ -235,7 +238,7 @@ class ManagementCommands @Inject constructor(
 
     // ─── Extension Commands ───
 
-    @Command("extension list")
+    @Command("extension|extensions list")
     fun extensionList(source: CommandSource) {
         val installed = extensionService.getInstalledExtensions()
         val loaded = extensionService.getLoadedExtensions()
@@ -247,7 +250,7 @@ class ManagementCommands @Inject constructor(
         }
     }
 
-    @Command("extension reload")
+    @Command("extension|extensions reload")
     fun extensionReload(source: CommandSource) {
         extensionService.reloadExtensions()
         source.sendMessage("Extensions reloaded.")
@@ -270,23 +273,23 @@ class ManagementCommands @Inject constructor(
         source.sendMessage("  cluster nodes          - List cluster nodes")
         source.sendMessage("")
         source.sendMessage("Instances:")
-        source.sendMessage("  instance list          - List all instances")
-        source.sendMessage("  instance create <cfg>  - Create a new instance")
-        source.sendMessage("  instance stop <id>     - Stop an instance")
-        source.sendMessage("  instance info <id>     - Show instance details")
-        source.sendMessage("  instance execute <id>  - Execute command on instance")
+        source.sendMessage("  instances list          - List all instances")
+        source.sendMessage("  instances create <cfg> <amount>  - Create new instances")
+        source.sendMessage("  instances stop <id>     - Stop an instance")
+        source.sendMessage("  instances info <id>     - Show instance details")
+        source.sendMessage("  instances execute <id>  - Execute command on instance")
         source.sendMessage("")
         source.sendMessage("Configuration:")
-        source.sendMessage("  config list            - List configurations")
-        source.sendMessage("  config reload          - Reload configurations from disk")
+        source.sendMessage("  configs list            - List configurations")
+        source.sendMessage("  configs reload          - Reload configurations from disk")
         source.sendMessage("")
         source.sendMessage("Templates:")
-        source.sendMessage("  template list          - List local templates")
-        source.sendMessage("  template sync <p> <n>  - Sync template to node")
+        source.sendMessage("  templates list          - List local templates")
+        source.sendMessage("  templates sync <p> <n>  - Sync template to node")
         source.sendMessage("")
         source.sendMessage("Extensions:")
-        source.sendMessage("  extension list         - List extensions")
-        source.sendMessage("  extension reload       - Reload extensions")
+        source.sendMessage("  extensions list         - List extensions")
+        source.sendMessage("  extensions reload       - Reload extensions")
         source.sendMessage("")
         source.sendMessage("System:")
         source.sendMessage("  help                   - Show this help")

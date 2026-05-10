@@ -30,6 +30,10 @@ class CommandBootstrap @Inject constructor(
                 while (!Thread.currentThread().isInterrupted) {
                     val line = reader.readLine() ?: break
 
+                    if (line.isBlank()) {
+                        continue
+                    }
+
                     if (line.equals("stop", ignoreCase = true) || line.equals("exit", ignoreCase = true)) {
                         log("Shutdown requested via console", LogType.INFORMATION)
                         Runtime.getRuntime().exit(0)

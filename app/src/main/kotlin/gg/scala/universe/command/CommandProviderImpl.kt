@@ -5,6 +5,7 @@ import com.google.inject.Singleton
 import gg.scala.universe.app.UniverseApplication
 import org.incendo.cloud.CommandManager
 import org.incendo.cloud.annotations.AnnotationParser
+import org.incendo.cloud.kotlin.coroutines.annotations.installCoroutineSupport
 import org.incendo.cloud.meta.CommandMeta
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -22,6 +23,10 @@ class CommandProviderImpl @Inject constructor(
         commandManager,
         CommandSource::class.java
     ) { CommandMeta.empty() }
+
+    init {
+        annotationParser.installCoroutineSupport()
+    }
 
     private val registeredCommands = ConcurrentHashMap.newKeySet<CommandInfo>()
 
