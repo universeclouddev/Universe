@@ -12,13 +12,15 @@ import gg.scala.universe.task.DeployInstanceTask
 import gg.scala.universe.task.ExecuteCommandTask
 import gg.scala.universe.task.StopInstanceTask
 import gg.scala.universe.task.UniverseTask
+import gg.scala.universe.template.TemplateManager
 import java.nio.file.Paths
 
 @Singleton
 class TaskRouter @Inject constructor(
     private val runtimeRegistry: RuntimeRegistry,
     private val clusterStateService: ClusterStateService,
-    private val portAllocator: PortAllocator
+    private val portAllocator: PortAllocator,
+    private val templateManager: TemplateManager
 ) {
     fun route(task: UniverseTask) {
         when (task) {
@@ -42,6 +44,13 @@ class TaskRouter @Inject constructor(
 
         val workingDir = Paths.get("./running/${task.instanceId}")
         workingDir.toFile().mkdirs()
+
+        templateManager.installTemplates(
+            configuration = configuration,
+            instanceId = task.instanceId,
+            allocatedPort = allocatedPort,
+            targetDir = workingDir
+        )
 
         val processHandle = runtimeProvider.start(
             instanceId = task.instanceId,
