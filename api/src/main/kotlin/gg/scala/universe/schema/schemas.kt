@@ -39,7 +39,8 @@ data class Configuration(
     val minimumServiceCount: Int = 1,
     val environmentVariables: Map<String, String> = emptyMap(),
     val templateInstallationConfig: TemplateInstallationConfig = TemplateInstallationConfig(),
-    val fileModifications: Map<String, String> = emptyMap(),
+    val fileModifications: List<String> = emptyList(),
+    val properties: Map<String, String> = emptyMap(),
 )
 
 data class TemplateInstallationConfig(

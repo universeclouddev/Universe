@@ -184,7 +184,7 @@ class TemplateManager @Inject constructor(
 
         val variables = buildVariableMap(configuration, instanceId, allocatedPort)
 
-        configuration.fileModifications.forEach { (relativePath, _) ->
+        configuration.fileModifications.forEach { relativePath ->
             val file = targetDir.resolve(relativePath)
             if (!file.exists()) {
                 log("File for modification not found: $file", LogType.WARNING)

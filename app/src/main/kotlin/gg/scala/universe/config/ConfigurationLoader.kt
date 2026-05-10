@@ -94,7 +94,7 @@ object ConfigurationLoader {
                 oneInGroups = emptyList(),
                 onTemplatePasteOverridePresentFiles = false
             ),
-            fileModifications = emptyMap()
+            fileModifications = emptyList()
         )
     }
 }
