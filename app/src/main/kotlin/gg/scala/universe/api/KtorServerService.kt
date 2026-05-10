@@ -9,6 +9,8 @@ import gg.scala.universe.api.plugins.configureExceptionCatcher
 import gg.scala.universe.api.plugins.configureLoggingMessages
 import gg.scala.universe.api.plugins.configureSecurity
 import gg.scala.universe.api.routing.configureInstanceRoutes
+import gg.scala.universe.command.CommandProvider
+import gg.scala.universe.command.CommandSource
 import gg.scala.universe.config.UniverseMainConfiguration
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.task.TaskDispatcher
@@ -25,7 +27,9 @@ class KtorServerService @Inject constructor(
     private val configuration: UniverseMainConfiguration,
     private val clusterStateService: ClusterStateService,
     private val hazelcastInstance: HazelcastInstance,
-    private val taskDispatcher: TaskDispatcher
+    private val taskDispatcher: TaskDispatcher,
+    private val commandProvider: CommandProvider,
+    private val commandSource: CommandSource
 ) {
     private var server: io.ktor.server.engine.EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -47,7 +51,7 @@ class KtorServerService @Inject constructor(
             port = configuration.apiPort,
             host = configuration.address,
             module = {
-                configureServerModule(clusterStateService, hazelcastInstance, taskDispatcher)
+                configureServerModule(clusterStateService, hazelcastInstance, taskDispatcher, commandProvider, commandSource)
             }
         ).start(wait = false)
 
@@ -63,12 +67,14 @@ class KtorServerService @Inject constructor(
 private fun Application.configureServerModule(
     clusterStateService: ClusterStateService,
     hazelcastInstance: HazelcastInstance,
-    taskDispatcher: TaskDispatcher
+    taskDispatcher: TaskDispatcher,
+    commandProvider: CommandProvider,
+    commandSource: CommandSource
 ) {
     configureCors()
     configureSecurity()
     configureLoggingMessages()
     configureSerialization()
     configureExceptionCatcher()
-    configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher)
+    configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, commandProvider, commandSource)
 }

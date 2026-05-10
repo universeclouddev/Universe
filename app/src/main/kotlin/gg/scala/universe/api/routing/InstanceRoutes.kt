@@ -17,14 +17,35 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import gg.scala.universe.command.CommandProvider
+import gg.scala.universe.command.CommandSource
 import java.util.UUID
 
 fun Application.configureInstanceRoutes(
     clusterStateService: ClusterStateService,
     hazelcastInstance: HazelcastInstance,
-    taskDispatcher: TaskDispatcher
+    taskDispatcher: TaskDispatcher,
+    commandProvider: CommandProvider,
+    commandSource: CommandSource
 ) {
     routing {
+        route("/api/commands/execute") {
+            post {
+                val request = call.receive<ExecuteCommandRequest>()
+                val command = request.command
+                
+                val output = mutableListOf<String>()
+                val capturingSource = CapturingCommandSource(output)
+                
+                commandProvider.execute(capturingSource, command)
+                
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "command" to command,
+                    "output" to output
+                ))
+            }
+        }
+
         route("/api/instances") {
             get {
                 val instances = clusterStateService.getAllInstances()
@@ -92,3 +113,20 @@ private fun generateInstanceId(): String {
 
 data class CreateInstanceRequest(val configurationName: String)
 data class UpdateStateRequest(val state: String, val lastHeartbeat: Long? = null)
+data class ExecuteCommandRequest(val command: String)
+
+private class CapturingCommandSource(private val output: MutableList<String>) : CommandSource {
+    override fun sendMessage(message: String) {
+        output.add(message)
+    }
+
+    override fun sendMessage(vararg messages: String) {
+        messages.forEach { output.add(it) }
+    }
+
+    override fun sendMessage(messages: MutableCollection<String>) {
+        output.addAll(messages)
+    }
+
+    override fun checkPermission(permission: String): Boolean = true
+}

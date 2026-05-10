@@ -15,6 +15,8 @@
  */
 package gg.scala.universe.command
 
+import com.google.inject.Inject
+import com.google.inject.Singleton
 import org.incendo.cloud.CloudCapability
 import org.incendo.cloud.CommandManager
 import org.incendo.cloud.execution.ExecutionCoordinator
@@ -22,14 +24,13 @@ import org.incendo.cloud.internal.CommandRegistrationHandler
 import org.incendo.cloud.meta.CommandMeta
 import org.incendo.cloud.meta.SimpleCommandMeta
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 /**
  * Constructs the default implementation of the [CommandManager]. Applying asynchronous command executing using
  * a thread pool with 4 threads.
  */
-//@Singleton
-internal class DefaultCommandManager(executor: ExecutorService = Executors.newFixedThreadPool(4))
+@Singleton
+internal class DefaultCommandManager @Inject constructor(executor: ExecutorService)
     : CommandManager<CommandSource>(
         ExecutionCoordinator.builder<CommandSource>()
             .parsingExecutor(executor)
