@@ -37,6 +37,12 @@ dependencies {
         exclude(group = "org.jetbrains.kotlin") // disable transitive kotlin
         exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect") // disable transitive kotlin reflect
     }
+
+    // ktor
+    runtimeDownload(libs.bundles.ktor) {
+        exclude(group = "org.jetbrains.kotlin")
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
+    }
 }
 
 tasks.shadowJar {
