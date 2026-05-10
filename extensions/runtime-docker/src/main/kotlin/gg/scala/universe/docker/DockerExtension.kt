@@ -8,7 +8,7 @@ import gg.scala.universe.runtime.RuntimeRegistry
 
 class DockerExtension : Extension {
 
-    override fun id(): String = "docker-runtime"
+    override fun id(): String = "runtime-docker"
     override fun version(): String = "1.0.0"
 
     @Inject

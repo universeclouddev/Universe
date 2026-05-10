@@ -18,6 +18,7 @@ okio = "3.17.0"
 hazelcast = "5.6.0"
 ktor = "3.4.3"
 docker-java = "3.7.1"
+aws-sdk = "2.31.20"
 
 [libraries]
 # dependency download
@@ -66,6 +67,9 @@ docker-java-core = { module = "com.github.docker-java:docker-java-core", version
 docker-java-api = { module = "com.github.docker-java:docker-java-api", version.ref = "docker-java" }
 docker-java-transport-httpclient5 = { module = "com.github.docker-java:docker-java-transport-httpclient5", version.ref = "docker-java" }
 
+# aws
+aws-s3 = { module = "software.amazon.awssdk:s3", version.ref = "aws-sdk" }
+
 # other
 
 
@@ -82,6 +86,7 @@ ktor = [
 dockerJava = [
     "docker-java-core", "docker-java-api", "docker-java-transport-httpclient5"
 ]
+s3 = ["aws-s3"]
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

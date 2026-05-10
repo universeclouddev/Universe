@@ -16,6 +16,7 @@ import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.HazelcastService
 import gg.scala.universe.hz.HzGuiceModule
 import gg.scala.universe.hz.ResilienceMembershipListener
+import gg.scala.universe.command.CommandBootstrap
 import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.runtime.ScreenRuntimeProvider
 import gg.scala.universe.runtime.TmuxRuntimeProvider
@@ -26,11 +27,12 @@ fun run() {
 }
 
 class UniverseApplication {
-    lateinit var mainConfiguration: UniverseMainConfiguration
+    var mainConfiguration: UniverseMainConfiguration
 
     val injector: Injector
     val hzService: HazelcastService
     val extensionService: ExtensionService
+    var commandBootstrap: CommandBootstrap
 
     init {
         instance = this
@@ -63,6 +65,20 @@ class UniverseApplication {
 
 
         extensionService.loadExtensions()
+
+        commandBootstrap = injector.getInstance(CommandBootstrap::class.java)
+        commandBootstrap.start()
+
+        Runtime.getRuntime().addShutdownHook(Thread({
+            log("Shutting down Universe...", LogType.INFORMATION)
+            commandBootstrap.stop()
+            if (mainConfiguration.isMasterNode) {
+                val ktorService = injector.getInstance(KtorServerService::class.java)
+                ktorService.stop()
+            }
+            hzService.hzInstance.shutdown()
+            log("Universe shutdown complete", LogType.INFORMATION)
+        }, "universe-shutdown"))
 
         if (mainConfiguration.isMasterNode) {
             val ktorService = injector.getInstance(KtorServerService::class.java)
