@@ -18,7 +18,7 @@ okio = "3.17.0"
 hazelcast = "5.6.0"
 ktor = "3.4.3"
 docker-java = "3.7.1"
-aws-sdk = "2.31.20"
+aws-sdk = "2.44.4"
 
 [libraries]
 # dependency download
