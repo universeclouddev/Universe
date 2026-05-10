@@ -24,7 +24,7 @@ data class Template(
     val name: String,
     val group: String,
     val storage: String,
-    val priority: String,
+    val priority: Int,
 )
 
 data class Configuration(

@@ -7,6 +7,7 @@ import cz.lukynka.prettylog.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.schema.Configuration
 import gg.scala.universe.schema.PortRange
+import gg.scala.universe.schema.Template
 import gg.scala.universe.schema.TemplateInstallationConfig
 import java.nio.file.Files
 import java.nio.file.Path
@@ -78,11 +79,16 @@ object ConfigurationLoader {
             instanceGroups = listOf("lobby"),
             nodes = listOf("node-1"),
             hostAddress = "127.0.0.1",
-            availablePorts = PortRange(25565, 25570),
+            availablePorts = PortRange(25600, 25700),
             minimumServiceCount = 1,
             environmentVariables = emptyMap(),
             templateInstallationConfig = TemplateInstallationConfig(
-                allOf = emptyList(),
+                allOf = listOf(Template(
+                    name = "server",
+                    group = "default",
+                    storage = "local",
+                    priority = 1
+                )),
                 allInGroups = listOf("default"),
                 oneOf = emptyList(),
                 oneInGroups = emptyList(),
