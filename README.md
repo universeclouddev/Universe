@@ -31,10 +31,10 @@ A single-JAR orchestrator for deploying and managing application instances acros
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                       Wrapper Node(s)                       │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
-│  │ TaskRouter  │  │  Template   │  │  RuntimeProvider    │ │
-│  │ (IExecutor) │  │   Manager   │  │  (screen/tmux/docker)│ │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────────────┐ │
+│  │ TaskRouter  │  │  Template   │  │  RuntimeProvider     │ │
+│  │ (IExecutor) │  │   Manager   │  │ (screen/tmux/docker) │ │
+│  └─────────────┘  └─────────────┘  └──────────────────────┘ │
 │         │                │                    │             │
 │         ▼                ▼                    ▼             │
 │   Receive Tasks    Copy Templates      Start Processes      │
@@ -71,7 +71,7 @@ Artifacts are copied to `.built/` after build.
 The `loader` module produces a fat JAR with all dependencies embedded or downloaded at runtime.
 
 ```bash
-java -jar .built/loader-shadow.jar
+java -jar .built/universe-loader-0.0.1.jar
 ```
 
 On first run, the following files/directories are created:
@@ -130,7 +130,7 @@ Create a `docker-compose.yml`:
 ```yaml
 services:
   universe-master:
-    image: eclipse-temurin:25-jre
+    image: git.lunarlabs.dev/scala/universe:latest
     container_name: universe-master
     stdin_open: true
     tty: true
@@ -138,36 +138,23 @@ services:
       - "7000:7000"   # REST API
       - "6000:6000"   # Hazelcast
     volumes:
-      - ./.built:/app:ro
-      - master-data:/data
-    working_dir: /data
-    command: ["java", "-jar", "/app/loader-shadow.jar"]
-    environment:
-      - JAVA_OPTS=-Xmx512m
+      - ./data:/data
 
+  # You can also add a wrapper, but the master should be able to run instances on its own
   universe-wrapper:
-    image: eclipse-temurin:25-jre
-    container_name: universe-wrapper
+    image: git.lunarlabs.dev/scala/universe:latest
     depends_on:
       - universe-master
     volumes:
-      - ./.built:/app:ro
-      - wrapper-data:/data
-    working_dir: /data
-    command: ["java", "-jar", "/app/loader-shadow.jar"]
-    environment:
-      - JAVA_OPTS=-Xmx256m
+      - ./wrapper-data:/data
 
-volumes:
-  master-data:
-  wrapper-data:
 ```
 
 **Important:** The Wrapper's `config.json` must set `isMasterNode: false` and point to the Master's Hazelcast address:
 ```json
 {
   "isMasterNode": false,
-  "masterAddress": "universe-master",
+  "masterAddress": "universe-master", // In this case, the Docker Compose service name, it could also be the Master's IP if running separately
   "masterPort": 6000,
   "masterApiPort": 7000
 }
@@ -175,7 +162,6 @@ volumes:
 
 Run:
 ```bash
-./gradlew build
 docker compose up -d
 ```
 
@@ -190,12 +176,7 @@ instance list
 stop
 ```
 
-**Option 2: Docker Compose exec**
-```bash
-docker compose exec -T universe-master sh -c 'echo "cluster status" > /proc/1/fd/0'
-```
-
-**Option 3: REST API (recommended)**
+**Option 2: REST API (recommended)**
 ```bash
 # Get all instances
 curl http://localhost:7000/api/instances
@@ -248,11 +229,12 @@ Templates live in `./templates/<group>/<name>/`.
 
 ```
 templates/
-  server/
-    base/
+  global/
+    server/
       server.properties
       plugins/
-    lobby/
+  lobby/
+    default/
       server.properties
       world/
 ```
@@ -266,7 +248,7 @@ When an instance is created, `TemplateManager`:
 **Template sync between nodes:**
 ```bash
 template sync server/base node-2
-template sync server/(*) node-2   # sync all in group
+template sync server/* node-2     # sync all in group
 template sync * node-2            # sync all templates
 ```
 
@@ -315,7 +297,7 @@ s3 download server/base    # download template from S3
 3. Register in `onLoad()` via injected `TemplateStorageRegistry`
 
 ### Key rules
-- Extensions must **only** depend on `:api` and `:extensions:extension-api`
+- Built-In extensions depend on `:api` and `:extensions:extension-api` by default
 - Never depend on `:app` from an extension
 - Use `runtimeDownload` for external dependencies
 - Register via injected registries in `onLoad()`, not statically

@@ -25,8 +25,9 @@
             <option value="$PROJECT_DIR$/buildSrc" />
             <option value="$PROJECT_DIR$/extensions" />
             <option value="$PROJECT_DIR$/extensions/api" />
-            <option value="$PROJECT_DIR$/extensions/docker-runtime" />
             <option value="$PROJECT_DIR$/extensions/example" />
+            <option value="$PROJECT_DIR$/extensions/runtime-docker" />
+            <option value="$PROJECT_DIR$/extensions/storage-s3" />
             <option value="$PROJECT_DIR$/loader" />
           </set>
         </option>
