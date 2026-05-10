@@ -6,7 +6,6 @@ import com.hazelcast.core.Hazelcast
 import com.hazelcast.core.HazelcastInstance
 import cz.lukynka.prettylog.LogType
 import cz.lukynka.prettylog.log
-import gg.scala.universe.app.UniverseApplication
 import gg.scala.universe.config.UniverseMainConfiguration
 
 class HazelcastService {
