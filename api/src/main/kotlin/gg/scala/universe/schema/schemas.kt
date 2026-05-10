@@ -2,6 +2,24 @@ package gg.scala.universe.schema
 
 data class PortRange(val min: Int, val max: Int)
 
+enum class InstanceState {
+    CREATING,
+    ONLINE,
+    OFFLINE,
+    STOPPED
+}
+
+data class InstanceInfo(
+    val id: String,
+    val configurationName: String,
+    val wrapperNodeId: String,
+    val hostAddress: String,
+    val allocatedPort: Int,
+    val state: InstanceState,
+    val lastHeartbeat: Long,
+    val processPid: Long?
+)
+
 data class Template(
     val name: String,
     val group: String,
@@ -10,23 +28,24 @@ data class Template(
 )
 
 data class Configuration(
-    val name: String,
-    val runtime: String,
-    val command: String,
-    val static: Boolean,
-    val instanceGroups: List<String>,
-    val nodes: List<String>,
-    val hostAddress: String,
-    val availablePorts: PortRange,
-    val minimumServiceCount: Int,
-    val environmentVariables: Map<String, String>,
-    val templateInstallationConfig: TemplateInstallationConfig,
+    val name: String = "default",
+    val runtime: String = "screen",
+    val command: String = "",
+    val static: Boolean = false,
+    val instanceGroups: List<String> = emptyList(),
+    val nodes: List<String> = listOf("node-1"),
+    val hostAddress: String = "127.0.0.1",
+    val availablePorts: PortRange = PortRange(25565, 25570),
+    val minimumServiceCount: Int = 1,
+    val environmentVariables: Map<String, String> = emptyMap(),
+    val templateInstallationConfig: TemplateInstallationConfig = TemplateInstallationConfig(),
+    val fileModifications: Map<String, String> = emptyMap(),
 )
 
 data class TemplateInstallationConfig(
-    val allOf: List<Template>,
-    val allInGroups: List<String>,
-    val oneOf: List<Template>,
-    val oneInGroups: List<String>,
-    val onTemplatePasteOverridePresentFiles: Boolean,
+    val allOf: List<Template> = emptyList(),
+    val allInGroups: List<String> = emptyList(),
+    val oneOf: List<Template> = emptyList(),
+    val oneInGroups: List<String> = emptyList(),
+    val onTemplatePasteOverridePresentFiles: Boolean = false,
 )
