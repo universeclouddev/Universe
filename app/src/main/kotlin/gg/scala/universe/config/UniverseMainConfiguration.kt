@@ -3,6 +3,7 @@ package gg.scala.universe.config
 data class UniverseMainConfiguration(
     val address: String = "127.0.0.1",
     val port: Int = 6000,
+    val apiPort: Int = 7000,
     val nodeId: String = "node-1",
     val clusterName: String = "universe-cluster",
 
