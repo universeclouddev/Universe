@@ -22,6 +22,9 @@ import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.runtime.ProcessRuntimeProvider
 import gg.scala.universe.runtime.ScreenRuntimeProvider
 import gg.scala.universe.runtime.TmuxRuntimeProvider
+import gg.scala.universe.service.InstanceCountEnforcer
+import gg.scala.universe.service.InstanceHealthMonitor
+import gg.scala.universe.service.NodeShutdownService
 
 fun run() {
     log("Starting Universe", LogType.INFORMATION)
@@ -61,6 +64,10 @@ class UniverseApplication {
         runtimeRegistry.register("process", ProcessRuntimeProvider())
         log("Registered built-in runtime providers (tmux, screen, process)", LogType.INFORMATION)
 
+        // Start health monitor on every node (wrappers run instances too)
+        val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
+        healthMonitor.start()
+
         if (mainConfiguration.isMasterNode) {
             val clusterStateService = injector.getInstance(ClusterStateService::class.java)
             hzService.hzInstance.cluster.addMembershipListener(
@@ -83,9 +90,15 @@ class UniverseApplication {
         Runtime.getRuntime().addShutdownHook(Thread({
             log("Shutting down Universe...", LogType.INFORMATION)
             commandBootstrap.stop()
+            val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
+            healthMonitor.stop()
+            val nodeShutdownService = injector.getInstance(NodeShutdownService::class.java)
+            nodeShutdownService.stopAllLocalInstances()
             if (mainConfiguration.isMasterNode) {
                 val ktorService = injector.getInstance(KtorServerService::class.java)
                 ktorService.stop()
+                val enforcer = injector.getInstance(InstanceCountEnforcer::class.java)
+                enforcer.stop()
             }
             hzService.hzInstance.shutdown()
             log("Universe shutdown complete", LogType.INFORMATION)
@@ -94,6 +107,9 @@ class UniverseApplication {
         if (mainConfiguration.isMasterNode) {
             val ktorService = injector.getInstance(KtorServerService::class.java)
             ktorService.start()
+
+            val enforcer = injector.getInstance(InstanceCountEnforcer::class.java)
+            enforcer.start()
         }
     }
 
