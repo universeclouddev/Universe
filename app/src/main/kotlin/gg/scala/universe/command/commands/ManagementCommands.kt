@@ -9,8 +9,9 @@ import gg.scala.universe.config.ConfigurationLoader
 import gg.scala.universe.extension.ExtensionService
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.task.TaskDispatcher
-import gg.scala.universe.schema.InstanceInfo
 import gg.scala.universe.schema.InstanceState
+import gg.scala.universe.service.InstanceCreationService
+import gg.scala.universe.service.NodeShutdownService
 import gg.scala.universe.template.TemplateManager
 import io.ktor.server.application.Application
 import io.ktor.server.request.receive
@@ -22,6 +23,7 @@ import io.ktor.http.HttpStatusCode
 import org.incendo.cloud.annotations.Argument
 import org.incendo.cloud.annotations.Command
 import com.hazelcast.core.HazelcastInstance
+import gg.scala.universe.hz.nodeName
 import java.nio.file.Path
 import java.nio.file.Files
 import kotlin.io.path.exists
@@ -40,7 +42,9 @@ class ManagementCommands @Inject constructor(
     private val hazelcastInstance: HazelcastInstance,
     private val taskDispatcher: TaskDispatcher,
     private val extensionService: ExtensionService,
-    private val templateManager: TemplateManager
+    private val templateManager: TemplateManager,
+    private val instanceCreationService: InstanceCreationService,
+    private val nodeShutdownService: NodeShutdownService
 ) {
 
     // ─── Cluster Commands ───
@@ -82,16 +86,19 @@ class ManagementCommands @Inject constructor(
         }
 
         source.sendMessage("=== Instances (${instances.size}) ===")
-        source.sendMessage(String.format("%-8s %-12s %-15s %-8s %-10s", "ID", "Config", "Host", "Port", "State"))
+        source.sendMessage(String.format("%-10s %-12s %-15s %-8s %-10s", "ID", "Config", "Host", "Port", "State"))
         instances.forEach { instance ->
+            val config = clusterStateService.getConfiguration(instance.configurationName)
+            val staticMarker = if (config?.static == true) " [STATIC]" else ""
             source.sendMessage(
                 String.format(
-                    "%-8s %-12s %-15s %-8d %-10s",
+                    "%-10s %-12s %-15s %-8d %-10s%s",
                     instance.id,
                     instance.configurationName,
                     instance.hostAddress,
                     instance.allocatedPort,
-                    instance.state
+                    instance.state,
+                    staticMarker
                 )
             )
         }
@@ -109,26 +116,49 @@ class ManagementCommands @Inject constructor(
             return
         }
 
+        // Static configs: only one instance, deterministic ID, no templates
+        if (configuration.static) {
+            val existing = clusterStateService.getInstance(configName)
+            if (existing != null && (existing.state == InstanceState.ONLINE || existing.state == InstanceState.CREATING)) {
+                source.sendMessage("Static instance '$configName' is already running (state=${existing.state}).")
+                return
+            }
+
+            val instanceInfo = instanceCreationService.createInstance(configuration, instanceId = configName)
+            if (instanceInfo == null) {
+                source.sendMessage(
+                    "No node has enough resources (RAM=${configuration.ramMB}MB, CPU=${configuration.cpu}) " +
+                    "for static instance '$configName'."
+                )
+                return
+            }
+
+            val member = hazelcastInstance.cluster.members.firstOrNull {
+                it.uuid.toString() == instanceInfo.wrapperNodeId
+            } ?: hazelcastInstance.cluster.localMember
+
+            source.sendMessage("Created static instance '$configName' on node ${member.nodeName()}")
+            return
+        }
+
+        // Non-static: resource-aware node selection
         for (i in 1..amount) {
-            val wrapperMember = hazelcastInstance.cluster.members.firstOrNull { !it.localMember() }
-                ?: hazelcastInstance.cluster.localMember
+            val instanceInfo = instanceCreationService.createInstance(configuration)
+            if (instanceInfo == null) {
+                source.sendMessage(
+                    "No node has enough resources (RAM=${configuration.ramMB}MB, CPU=${configuration.cpu}) " +
+                    "for instance #$i of '$configName'."
+                )
+                continue
+            }
 
-            val instanceId = generateInstanceId()
-            val instanceInfo = InstanceInfo(
-                id = instanceId,
-                configurationName = configuration.name,
-                wrapperNodeId = wrapperMember.uuid.toString(),
-                hostAddress = configuration.hostAddress,
-                allocatedPort = 0,
-                state = InstanceState.CREATING,
-                lastHeartbeat = System.currentTimeMillis(),
-                processPid = null
+            val member = hazelcastInstance.cluster.members.firstOrNull {
+                it.uuid.toString() == instanceInfo.wrapperNodeId
+            } ?: hazelcastInstance.cluster.localMember
+
+            source.sendMessage(
+                "Created instance ${instanceInfo.id} from configuration '$configName' on node ${member.nodeName()}"
             )
-
-            clusterStateService.putInstance(instanceInfo)
-            taskDispatcher.dispatchDeploy(instanceInfo, wrapperMember)
-
-            source.sendMessage("Created instance $instanceId from configuration '$configName' on ${wrapperMember.uuid}")
         }
     }
 
@@ -162,13 +192,22 @@ class ManagementCommands @Inject constructor(
             return
         }
 
+        val config = clusterStateService.getConfiguration(instance.configurationName)
+        val isStatic = config?.static == true
+
         source.sendMessage("=== Instance $instanceId ===")
         source.sendMessage("  Configuration: ${instance.configurationName}")
+        source.sendMessage("  Static: $isStatic")
         source.sendMessage("  State: ${instance.state}")
         source.sendMessage("  Host: ${instance.hostAddress}:${instance.allocatedPort}")
         source.sendMessage("  Wrapper: ${instance.wrapperNodeId}")
         source.sendMessage("  PID: ${instance.processPid ?: "N/A"}")
         source.sendMessage("  Last heartbeat: ${instance.lastHeartbeat}")
+        if (isStatic) {
+            source.sendMessage("  Working dir: ./static/${instance.configurationName}")
+        } else {
+            source.sendMessage("  Working dir: ./running/${instance.id}")
+        }
     }
 
     @Command("instance|instances execute <id> <command>")
@@ -258,12 +297,6 @@ class ManagementCommands @Inject constructor(
 
     // ─── System Commands ───
 
-    @Command("stop")
-    fun stop(source: CommandSource) {
-        source.sendMessage("Shutting down Universe...")
-        Runtime.getRuntime().exit(0)
-    }
-
     @Command("help")
     fun help(source: CommandSource) {
         source.sendMessage("=== Universe Commands ===")
@@ -296,7 +329,4 @@ class ManagementCommands @Inject constructor(
         source.sendMessage("  stop                   - Shutdown Universe")
     }
 
-    private fun generateInstanceId(): String {
-        return java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 6)
-    }
 }

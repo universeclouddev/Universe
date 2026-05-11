@@ -30,6 +30,10 @@ class ResilienceMembershipListener(
         }
 
         log("Marked ${affectedInstances.size} instance(s) as OFFLINE", LogType.WARNING)
+
+        // Clear node resource tracking for the disconnected wrapper
+        clusterStateService.clearNodeResources(memberUuid)
+        log("Cleared resource tracking for node $memberUuid", LogType.INFORMATION)
     }
 
 }

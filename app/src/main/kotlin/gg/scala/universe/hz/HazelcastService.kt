@@ -47,6 +47,8 @@ class HazelcastService {
 
         // Set node ID as a member attribute so it can be read by other members
         hzConfig.memberAttributeConfig.setAttribute("nodeId", configuration.nodeId)
+        hzConfig.memberAttributeConfig.setAttribute("maxRamMB", configuration.maxRamMB.toString())
+        hzConfig.memberAttributeConfig.setAttribute("maxCpu", configuration.maxCpu.toString())
 
         this.hzInstance = Hazelcast.newHazelcastInstance(hzConfig)
     }

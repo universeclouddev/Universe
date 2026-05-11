@@ -12,5 +12,10 @@ data class UniverseMainConfiguration(
     val masterPort: Int = 6000,
     val masterApiPort: Int = 7000,
 
-    val debug: Boolean = false
+    val debug: Boolean = false,
+
+    /** Maximum RAM (in MB) this node is allowed to allocate to instances. */
+    val maxRamMB: Int = 4096,
+    /** Maximum CPU units this node is allowed to allocate to instances. */
+    val maxCpu: Int = 400
 )

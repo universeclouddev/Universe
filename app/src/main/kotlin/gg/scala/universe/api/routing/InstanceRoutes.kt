@@ -1,12 +1,10 @@
 package gg.scala.universe.api.routing
 
 import com.hazelcast.core.HazelcastInstance
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.task.TaskDispatcher
-import gg.scala.universe.schema.InstanceInfo
 import gg.scala.universe.schema.InstanceState
+import gg.scala.universe.service.InstanceCreationService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
@@ -19,14 +17,14 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import gg.scala.universe.command.CommandProvider
 import gg.scala.universe.command.CommandSource
-import java.util.UUID
 
 fun Application.configureInstanceRoutes(
     clusterStateService: ClusterStateService,
     hazelcastInstance: HazelcastInstance,
     taskDispatcher: TaskDispatcher,
     commandProvider: CommandProvider,
-    commandSource: CommandSource
+    commandSource: CommandSource,
+    instanceCreationService: InstanceCreationService
 ) {
     routing {
         route("/api/commands/execute") {
@@ -57,26 +55,11 @@ fun Application.configureInstanceRoutes(
                 val configuration = clusterStateService.getConfiguration(request.configurationName)
                     ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Configuration not found"))
 
-                // Find an available Wrapper member (lite member or master itself)
-                val wrapperMember = hazelcastInstance.cluster.members.firstOrNull { !it.localMember() }
-                    ?: hazelcastInstance.cluster.localMember
-
-                val instanceId = generateInstanceId()
-                val instanceInfo = InstanceInfo(
-                    id = instanceId,
-                    configurationName = configuration.name,
-                    wrapperNodeId = wrapperMember.uuid.toString(),
-                    hostAddress = configuration.hostAddress,
-                    allocatedPort = 0, // Will be set by Wrapper during deployment
-                    state = InstanceState.CREATING,
-                    lastHeartbeat = System.currentTimeMillis(),
-                    processPid = null
-                )
-
-                clusterStateService.putInstance(instanceInfo)
-
-                // Dispatch deployment task via TaskDispatcher
-                taskDispatcher.dispatchDeploy(instanceInfo, wrapperMember)
+                val instanceInfo = instanceCreationService.createInstance(configuration)
+                    ?: return@post call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "No node has enough resources for this configuration")
+                    )
 
                 call.respond(HttpStatusCode.Created, instanceInfo)
             }
@@ -105,10 +88,6 @@ fun Application.configureInstanceRoutes(
             }
         }
     }
-}
-
-private fun generateInstanceId(): String {
-    return UUID.randomUUID().toString().replace("-", "").substring(0, 6)
 }
 
 data class CreateInstanceRequest(val configurationName: String)

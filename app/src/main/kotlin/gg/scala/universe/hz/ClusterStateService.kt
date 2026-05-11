@@ -6,6 +6,7 @@ import com.hazelcast.map.IMap
 import gg.scala.universe.schema.Configuration
 import gg.scala.universe.schema.InstanceInfo
 import gg.scala.universe.schema.InstanceState
+import gg.scala.universe.schema.NodeResources
 
 class ClusterStateService @Inject constructor(
     private val hazelcastInstance: HazelcastInstance
@@ -15,6 +16,9 @@ class ClusterStateService @Inject constructor(
 
     val instances: IMap<String, InstanceInfo>
         get() = hazelcastInstance.getMap("instances")
+
+    val nodeResources: IMap<String, NodeResources>
+        get() = hazelcastInstance.getMap("nodeResources")
 
     fun getConfiguration(name: String): Configuration? {
         return configurations[name]
@@ -47,5 +51,29 @@ class ClusterStateService @Inject constructor(
     fun updateInstanceState(id: String, state: InstanceState) {
         val existing = instances[id] ?: return
         instances[id] = existing.copy(state = state)
+    }
+
+    fun getNodeResources(nodeId: String): NodeResources {
+        return nodeResources[nodeId] ?: NodeResources(0, 0)
+    }
+
+    fun addNodeResources(nodeId: String, ramMB: Int, cpu: Int) {
+        val current = getNodeResources(nodeId)
+        nodeResources[nodeId] = NodeResources(
+            usedRamMB = current.usedRamMB + ramMB,
+            usedCpu = current.usedCpu + cpu
+        )
+    }
+
+    fun removeNodeResources(nodeId: String, ramMB: Int, cpu: Int) {
+        val current = getNodeResources(nodeId)
+        nodeResources[nodeId] = NodeResources(
+            usedRamMB = maxOf(0, current.usedRamMB - ramMB),
+            usedCpu = maxOf(0, current.usedCpu - cpu)
+        )
+    }
+
+    fun clearNodeResources(nodeId: String) {
+        nodeResources.remove(nodeId)
     }
 }

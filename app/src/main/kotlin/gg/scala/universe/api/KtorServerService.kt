@@ -14,6 +14,7 @@ import gg.scala.universe.command.CommandSource
 import gg.scala.universe.config.UniverseMainConfiguration
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.task.TaskDispatcher
+import gg.scala.universe.service.InstanceCreationService
 import io.ktor.server.application.Application
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
@@ -29,7 +30,8 @@ class KtorServerService @Inject constructor(
     private val hazelcastInstance: HazelcastInstance,
     private val taskDispatcher: TaskDispatcher,
     private val commandProvider: CommandProvider,
-    private val commandSource: CommandSource
+    private val commandSource: CommandSource,
+    private val instanceCreationService: InstanceCreationService
 ) {
     private var server: io.ktor.server.engine.EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -51,7 +53,7 @@ class KtorServerService @Inject constructor(
             port = configuration.apiPort,
             host = configuration.address,
             module = {
-                configureServerModule(clusterStateService, hazelcastInstance, taskDispatcher, commandProvider, commandSource)
+                configureServerModule(clusterStateService, hazelcastInstance, taskDispatcher, commandProvider, commandSource, instanceCreationService)
             }
         ).start(wait = false)
 
@@ -69,12 +71,13 @@ private fun Application.configureServerModule(
     hazelcastInstance: HazelcastInstance,
     taskDispatcher: TaskDispatcher,
     commandProvider: CommandProvider,
-    commandSource: CommandSource
+    commandSource: CommandSource,
+    instanceCreationService: InstanceCreationService
 ) {
     configureCors()
     configureSecurity()
     configureLoggingMessages()
     configureSerialization()
     configureExceptionCatcher()
-    configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, commandProvider, commandSource)
+    configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, commandProvider, commandSource, instanceCreationService)
 }

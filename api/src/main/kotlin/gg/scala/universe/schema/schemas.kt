@@ -17,7 +17,9 @@ data class InstanceInfo(
     val allocatedPort: Int,
     val state: InstanceState,
     val lastHeartbeat: Long,
-    val processPid: Long?
+    val processPid: Long?,
+    val allocatedRamMB: Int = 0,
+    val allocatedCpu: Int = 0
 )
 
 data class Template(
@@ -32,6 +34,8 @@ data class Configuration(
     val runtime: String = "screen",
     val command: String = "",
     val static: Boolean = false,
+    val ramMB: Int = 512,
+    val cpu: Int = 100,
     val instanceGroups: List<String> = emptyList(),
     val nodes: List<String> = listOf("node-1"),
     val hostAddress: String = "127.0.0.1",
@@ -41,6 +45,11 @@ data class Configuration(
     val templateInstallationConfig: TemplateInstallationConfig = TemplateInstallationConfig(),
     val fileModifications: List<String> = emptyList(),
     val properties: Map<String, String> = emptyMap(),
+)
+
+data class NodeResources(
+    val usedRamMB: Int = 0,
+    val usedCpu: Int = 0
 )
 
 data class TemplateInstallationConfig(

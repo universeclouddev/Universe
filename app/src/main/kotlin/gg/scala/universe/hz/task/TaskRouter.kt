@@ -44,39 +44,51 @@ class TaskRouter @Inject constructor(
         val allocatedPort = portAllocator.allocate(configuration.availablePorts)
             ?: return log("No available ports for instance ${task.instanceId} in range ${configuration.availablePorts.min}-${configuration.availablePorts.max}", LogType.ERROR)
 
-        val workingDir = Paths.get("./running/${task.instanceId}").toAbsolutePath().normalize()
+        val workingDir = if (configuration.static) {
+            Paths.get("./static/${configuration.name}").toAbsolutePath().normalize()
+        } else {
+            Paths.get("./running/${task.instanceId}").toAbsolutePath().normalize()
+        }
         workingDir.toFile().mkdirs()
 
-        templateManager.installTemplates(
-            configuration = configuration,
-            instanceId = task.instanceId,
-            allocatedPort = allocatedPort,
-            targetDir = workingDir
-        )
+        if (!configuration.static) {
+            templateManager.installTemplates(
+                configuration = configuration,
+                instanceId = task.instanceId,
+                allocatedPort = allocatedPort,
+                targetDir = workingDir
+            )
+        }
 
         val processHandle = try {
             runtimeProvider.start(
                 instanceId = task.instanceId,
                 workingDir = workingDir,
                 port = allocatedPort,
-                command = configuration.command
+                command = configuration.command,
+                ramMB = configuration.ramMB,
+                cpu = configuration.cpu
             )
         } catch (e: Exception) {
             val cause = e.cause ?: e
             val reason = "${cause.javaClass.simpleName}: ${cause.message ?: "no details"}"
             log("Failed to start instance ${task.instanceId}: $reason", LogType.ERROR)
 
-            // Clean up: remove instance record and working directory
+            // Clean up: remove instance record
             clusterStateService.removeInstance(task.instanceId)
-            try {
-                if (Files.exists(workingDir)) {
-                    Files.walk(workingDir)
-                        .sorted(Comparator.reverseOrder())
-                        .forEach { Files.deleteIfExists(it) }
-                    log("Cleaned up working directory for instance ${task.instanceId}", LogType.INFORMATION)
+
+            // Clean up working directory (skip for static instances)
+            if (!configuration.static) {
+                try {
+                    if (Files.exists(workingDir)) {
+                        Files.walk(workingDir)
+                            .sorted(Comparator.reverseOrder())
+                            .forEach { Files.deleteIfExists(it) }
+                        log("Cleaned up working directory for instance ${task.instanceId}", LogType.INFORMATION)
+                    }
+                } catch (cleanupEx: Exception) {
+                    log("Failed to clean up working directory for instance ${task.instanceId}: ${cleanupEx.message}", LogType.WARNING)
                 }
-            } catch (cleanupEx: Exception) {
-                log("Failed to clean up working directory for instance ${task.instanceId}: ${cleanupEx.message}", LogType.WARNING)
             }
 
             portAllocator.release(allocatedPort)
@@ -94,6 +106,10 @@ class TaskRouter @Inject constructor(
                 )
             )
         }
+
+        // Track node resources
+        val nodeId = existing?.wrapperNodeId ?: task.instanceId
+        clusterStateService.addNodeResources(nodeId, configuration.ramMB, configuration.cpu)
 
         log("Instance ${task.instanceId} deployed with PID ${processHandle.pid()}", LogType.SUCCESS)
     }
@@ -114,18 +130,23 @@ class TaskRouter @Inject constructor(
         runtimeProvider.stop(task.instanceId)
         portAllocator.release(instance.allocatedPort)
 
-        // Clean up working directory
-        val workingDir = Paths.get("./running/${task.instanceId}").toAbsolutePath().normalize()
-        try {
-            if (Files.exists(workingDir)) {
-                Files.walk(workingDir)
-                    .sorted(Comparator.reverseOrder())
-                    .forEach { Files.deleteIfExists(it) }
-                log("Cleaned up working directory for instance ${task.instanceId}", LogType.INFORMATION)
+        // Clean up working directory (skip for static instances)
+        if (configuration?.static != true) {
+            val workingDir = Paths.get("./running/${task.instanceId}").toAbsolutePath().normalize()
+            try {
+                if (Files.exists(workingDir)) {
+                    Files.walk(workingDir)
+                        .sorted(Comparator.reverseOrder())
+                        .forEach { Files.deleteIfExists(it) }
+                    log("Cleaned up working directory for instance ${task.instanceId}", LogType.INFORMATION)
+                }
+            } catch (cleanupEx: Exception) {
+                log("Failed to clean up working directory for instance ${task.instanceId}: ${cleanupEx.message}", LogType.WARNING)
             }
-        } catch (cleanupEx: Exception) {
-            log("Failed to clean up working directory for instance ${task.instanceId}: ${cleanupEx.message}", LogType.WARNING)
         }
+
+        // Release node resources
+        clusterStateService.removeNodeResources(instance.wrapperNodeId, instance.allocatedRamMB, instance.allocatedCpu)
 
         clusterStateService.updateInstanceState(task.instanceId, InstanceState.STOPPED)
         log("Instance ${task.instanceId} stopped", LogType.INFORMATION)
