@@ -16,9 +16,11 @@ interface RuntimeProvider {
      * @param workingDir Directory in which the process should run.
      * @param port The allocated local port for the instance.
      * @param command The command string to execute.
+     * @param ramMB Maximum RAM the instance may use (in megabytes). Zero means unlimited.
+     * @param cpu Maximum CPU units the instance may use. Zero means unlimited.
      * @return A [ProcessHandle] representing the started process.
      */
-    fun start(instanceId: String, workingDir: Path, port: Int, command: String): ProcessHandle
+    fun start(instanceId: String, workingDir: Path, port: Int, command: String, ramMB: Int, cpu: Int): ProcessHandle
 
     /**
      * Stops the process associated with the given instance.
@@ -35,4 +37,11 @@ interface RuntimeProvider {
      * @param command The command to send.
      */
     fun executeCommand(instanceId: String, command: String)
+
+    /**
+     * Returns true if the instance is currently running.
+     *
+     * @param instanceId Unique 6-character identifier for the instance.
+     */
+    fun isRunning(instanceId: String): Boolean
 }

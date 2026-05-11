@@ -17,18 +17,27 @@ class TmuxRuntimeProvider : RuntimeProvider {
 
     private val sessions = ConcurrentHashMap<String, ProcessHandle>()
 
-    override fun start(instanceId: String, workingDir: Path, port: Int, command: String): ProcessHandle {
+    override fun start(instanceId: String, workingDir: Path, port: Int, command: String, ramMB: Int, cpu: Int): ProcessHandle {
         val sessionName = sessionName(instanceId)
 
         // Ensure any stale session with this name is cleaned up first
         silentExec("tmux", "kill-session", "-t", sessionName)
 
-        val process = ProcessBuilder("tmux", "new-session", "-d", "-s", sessionName, "-c", workingDir.toAbsolutePath().toString(), command)
+        // Build command with resource limit fallback prefix
+        val wrappedCommand = CgroupResourceEnforcer.buildFallbackPrefix(ramMB, cpu) + command
+
+        val process = ProcessBuilder("tmux", "new-session", "-d", "-s", sessionName, "-c", workingDir.toAbsolutePath().toString(), wrappedCommand)
             .inheritIO()
             .start()
 
         val handle = process.toHandle()
         sessions[instanceId] = handle
+
+        // Attempt cgroup v2 enforcement
+        val cgroupPath = CgroupResourceEnforcer.createCgroup(instanceId, ramMB, cpu)
+        if (cgroupPath != null) {
+            CgroupResourceEnforcer.movePidToCgroup(handle.pid(), cgroupPath)
+        }
 
         log("Started tmux session '$sessionName' for instance $instanceId (PID ${handle.pid()})", LogType.SUCCESS)
         return handle
@@ -38,6 +47,7 @@ class TmuxRuntimeProvider : RuntimeProvider {
         val sessionName = sessionName(instanceId)
         silentExec("tmux", "kill-session", "-t", sessionName)
         sessions.remove(instanceId)
+        CgroupResourceEnforcer.cleanupCgroup(instanceId)
         log("Stopped tmux session '$sessionName' for instance $instanceId", LogType.INFORMATION)
     }
 
@@ -48,6 +58,18 @@ class TmuxRuntimeProvider : RuntimeProvider {
             .start()
         process.waitFor()
         log("Executed command on tmux session '$sessionName': $command", LogType.INFORMATION)
+    }
+
+    override fun isRunning(instanceId: String): Boolean {
+        val sessionName = sessionName(instanceId)
+        return try {
+            ProcessBuilder("tmux", "has-session", "-t", sessionName)
+                .inheritIO()
+                .start()
+                .waitFor() == 0
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun sessionName(instanceId: String): String = "universe-$instanceId"

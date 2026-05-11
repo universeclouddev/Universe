@@ -17,20 +17,27 @@ class ScreenRuntimeProvider : RuntimeProvider {
 
     private val sessions = ConcurrentHashMap<String, ProcessHandle>()
 
-    override fun start(instanceId: String, workingDir: Path, port: Int, command: String): ProcessHandle {
+    override fun start(instanceId: String, workingDir: Path, port: Int, command: String, ramMB: Int, cpu: Int): ProcessHandle {
         val sessionName = sessionName(instanceId)
 
         // Ensure any stale session with this name is cleaned up first
         silentExec("screen", "-S", sessionName, "-X", "quit")
 
-        // Start a detached screen session that changes to the working dir and runs the command
-        val shellCommand = "cd ${workingDir.toAbsolutePath()} && $command"
+        // Build command with resource limit fallback prefix
+        val prefix = CgroupResourceEnforcer.buildFallbackPrefix(ramMB, cpu)
+        val shellCommand = "cd ${workingDir.toAbsolutePath()} && $prefix$command"
         val process = ProcessBuilder("screen", "-dmS", sessionName, "bash", "-c", shellCommand)
             .inheritIO()
             .start()
 
         val handle = process.toHandle()
         sessions[instanceId] = handle
+
+        // Attempt cgroup v2 enforcement
+        val cgroupPath = CgroupResourceEnforcer.createCgroup(instanceId, ramMB, cpu)
+        if (cgroupPath != null) {
+            CgroupResourceEnforcer.movePidToCgroup(handle.pid(), cgroupPath)
+        }
 
         log("Started screen session '$sessionName' for instance $instanceId (PID ${handle.pid()})", LogType.SUCCESS)
         return handle
@@ -40,6 +47,7 @@ class ScreenRuntimeProvider : RuntimeProvider {
         val sessionName = sessionName(instanceId)
         silentExec("screen", "-S", sessionName, "-X", "quit")
         sessions.remove(instanceId)
+        CgroupResourceEnforcer.cleanupCgroup(instanceId)
         log("Stopped screen session '$sessionName' for instance $instanceId", LogType.INFORMATION)
     }
 
@@ -50,6 +58,21 @@ class ScreenRuntimeProvider : RuntimeProvider {
             .start()
         process.waitFor()
         log("Executed command on screen session '$sessionName': $command", LogType.INFORMATION)
+    }
+
+    override fun isRunning(instanceId: String): Boolean {
+        val sessionName = sessionName(instanceId)
+        return try {
+            val process = ProcessBuilder("screen", "-ls")
+                .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+            val output = process.inputStream.bufferedReader().readText()
+            process.waitFor()
+            output.contains(sessionName)
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun sessionName(instanceId: String): String = "universe-$instanceId"

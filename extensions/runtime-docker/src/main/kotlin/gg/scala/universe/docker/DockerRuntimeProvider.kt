@@ -34,7 +34,7 @@ class DockerRuntimeProvider(
     private val dockerClient: DockerClient = createDockerClient()
     private val containerIds = ConcurrentHashMap<String, String>()
 
-    override fun start(instanceId: String, workingDir: Path, port: Int, command: String): ProcessHandle {
+    override fun start(instanceId: String, workingDir: Path, port: Int, command: String, ramMB: Int, cpu: Int): ProcessHandle {
         val containerName = "universe-$instanceId"
 
         // Ensure no stale container with this name exists
@@ -96,6 +96,20 @@ class DockerRuntimeProvider(
             .withPortBindings(portBindings)
             .withAutoRemove(config.autoRemove)
             .withNetworkMode(config.network)
+
+        // Apply resource limits if configured (>0)
+        if (ramMB > 0) {
+            val bytes = ramMB * 1024L * 1024L
+            hostConfig.withMemory(bytes)
+            hostConfig.withMemorySwap(bytes) // Disable swap
+            log("Docker container '$containerName' memory limit: ${ramMB}MB", LogType.INFORMATION)
+        }
+        if (cpu > 0) {
+            // cpu units: 100 = 1 core worth of CPU time
+            val nanoCpus = cpu * 10_000_000L
+            hostConfig.withNanoCPUs(nanoCpus)
+            log("Docker container '$containerName' CPU limit: ${cpu} units (${nanoCpus / 1_000_000_000.0} cores)", LogType.INFORMATION)
+        }
 
         val createCmd = dockerClient.createContainerCmd(imageRef)
             .withName(containerName)
@@ -165,6 +179,16 @@ class DockerRuntimeProvider(
             log("Executed command in Docker container for instance $instanceId: $command", LogType.INFORMATION)
         } catch (e: Exception) {
             log("Failed to execute command in Docker container for instance $instanceId: ${e.message}", LogType.ERROR)
+        }
+    }
+
+    override fun isRunning(instanceId: String): Boolean {
+        val containerId = containerIds[instanceId] ?: return false
+        return try {
+            val info = dockerClient.inspectContainerCmd(containerId).exec()
+            info.state.running ?: false
+        } catch (_: Exception) {
+            false
         }
     }
 
