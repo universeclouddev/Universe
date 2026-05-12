@@ -19,7 +19,9 @@ data class InstanceInfo(
     val lastHeartbeat: Long,
     val processPid: Long?,
     val allocatedRamMB: Int = 0,
-    val allocatedCpu: Int = 0
+    val allocatedCpu: Int = 0,
+    /** Runtime provider key used when this instance was created (e.g., "docker", "k8s", "screen"). */
+    val runtime: String = "screen"
 )
 
 data class Template(
@@ -34,7 +36,7 @@ data class Configuration(
     val runtime: String = "screen",
     val command: String = "",
     val static: Boolean = false,
-    val ramMB: Int = 512,
+    val ramMB: Int = 2048,
     val cpu: Int = 100,
     val instanceGroups: List<String> = emptyList(),
     val nodes: List<String> = listOf("node-1"),

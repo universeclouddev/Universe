@@ -1,5 +1,7 @@
 package gg.scala.universe.template
 
+import gg.scala.universe.schema.Configuration
+
 /**
  * Registry for [TemplateVariableProvider] implementations.
  *
@@ -14,6 +16,10 @@ interface TemplateVariableRegistry {
 
     /**
      * Collects variables from all registered providers.
+     *
+     * @param configuration The instance configuration being deployed.
+     * @param instanceId The unique instance identifier.
+     * @param allocatedPort The port allocated to the instance.
      */
-    fun collectVariables(): Map<String, String>
+    fun collectVariables(configuration: Configuration, instanceId: String, allocatedPort: Int): Map<String, String>
 }

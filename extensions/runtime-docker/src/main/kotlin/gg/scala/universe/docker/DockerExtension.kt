@@ -14,15 +14,17 @@ class DockerExtension : Extension {
     @Inject
     private lateinit var runtimeRegistry: RuntimeRegistry
 
+    private lateinit var config: DockerConfig
+
     override fun onLoad() {
-        val config = DockerConfigLoader.load()
+        config = DockerConfigLoader.load()
         val provider = DockerRuntimeProvider(config)
-        runtimeRegistry.register("docker", provider)
+        runtimeRegistry.register(config.factoryName, provider)
         log("Docker runtime extension loaded (image=${config.javaImage.repository}:${config.javaImage.tag})", LogType.SUCCESS)
     }
 
     override fun onUnload() {
-        runtimeRegistry.unregister("docker")
+        runtimeRegistry.unregister(config.factoryName)
         log("Docker runtime extension unloaded", LogType.INFORMATION)
     }
 

@@ -19,7 +19,7 @@ data class DockerPortConfig(
 )
 
 data class DockerConfig(
-    val factoryName: String = "docker-jvm",
+    val factoryName: String = "docker",
     val network: String? = "host",
     val javaImage: DockerImageConfig = DockerImageConfig(),
     val volumes: List<DockerVolumeConfig> = emptyList(),
