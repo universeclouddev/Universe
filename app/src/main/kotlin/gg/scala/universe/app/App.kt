@@ -24,6 +24,7 @@ import gg.scala.universe.runtime.ScreenRuntimeProvider
 import gg.scala.universe.runtime.TmuxRuntimeProvider
 import gg.scala.universe.service.InstanceCountEnforcer
 import gg.scala.universe.service.InstanceHealthMonitor
+import gg.scala.universe.service.InstanceRecoveryService
 import gg.scala.universe.service.NodeShutdownService
 
 fun run() {
@@ -84,24 +85,32 @@ class UniverseApplication {
 
         extensionService.loadExtensions()
 
+        // Recover instances that were running before restart
+        val recoveryService = injector.getInstance(InstanceRecoveryService::class.java)
+        recoveryService.recover()
+
         commandBootstrap = injector.getInstance(CommandBootstrap::class.java)
         commandBootstrap.start()
 
         Runtime.getRuntime().addShutdownHook(Thread({
-            log("Shutting down Universe...", LogType.INFORMATION)
-            commandBootstrap.stop()
-            val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
-            healthMonitor.stop()
-            val nodeShutdownService = injector.getInstance(NodeShutdownService::class.java)
-            nodeShutdownService.stopAllLocalInstances()
-            if (mainConfiguration.isMasterNode) {
-                val ktorService = injector.getInstance(KtorServerService::class.java)
-                ktorService.stop()
-                val enforcer = injector.getInstance(InstanceCountEnforcer::class.java)
-                enforcer.stop()
+            try {
+                log("Shutting down Universe...", LogType.INFORMATION)
+                commandBootstrap.stop()
+                val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
+                healthMonitor.stop()
+                val nodeShutdownService = injector.getInstance(NodeShutdownService::class.java)
+                nodeShutdownService.stopAllLocalInstances()
+                if (mainConfiguration.isMasterNode) {
+                    val ktorService = injector.getInstance(KtorServerService::class.java)
+                    ktorService.stop()
+                    val enforcer = injector.getInstance(InstanceCountEnforcer::class.java)
+                    enforcer.stop()
+                }
+                hzService.hzInstance.shutdown()
+                log("Universe shutdown complete", LogType.INFORMATION)
+            } catch (e: Exception) {
+                log("Error during shutdown: ${e.message}", LogType.ERROR)
             }
-            hzService.hzInstance.shutdown()
-            log("Universe shutdown complete", LogType.INFORMATION)
         }, "universe-shutdown"))
 
         if (mainConfiguration.isMasterNode) {

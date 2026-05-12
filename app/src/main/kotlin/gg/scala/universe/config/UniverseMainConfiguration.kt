@@ -15,7 +15,7 @@ data class UniverseMainConfiguration(
     val debug: Boolean = false,
 
     /** Maximum RAM (in MB) this node is allowed to allocate to instances. */
-    val maxRamMB: Int = 4096,
+    val maxRamMB: Int = 8192,
     /** Maximum CPU units this node is allowed to allocate to instances. */
     val maxCpu: Int = 400
 )

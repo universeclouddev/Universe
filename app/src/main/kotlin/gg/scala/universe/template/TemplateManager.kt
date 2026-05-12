@@ -4,7 +4,6 @@ import com.google.inject.Inject
 import com.google.inject.Singleton
 import cz.lukynka.prettylog.LogType
 import cz.lukynka.prettylog.log
-import gg.scala.universe.config.UniverseMainConfiguration
 import gg.scala.universe.schema.Configuration
 import gg.scala.universe.schema.Template
 import gg.scala.universe.schema.TemplateInstallationConfig
@@ -31,7 +30,6 @@ import kotlin.random.Random
  */
 @Singleton
 class TemplateManager @Inject constructor(
-    private val mainConfiguration: UniverseMainConfiguration,
     private val variableRegistry: TemplateVariableRegistry,
     private val storageRegistry: TemplateStorageRegistry
 ) {
@@ -240,28 +238,15 @@ class TemplateManager @Inject constructor(
     /**
      * Builds the placeholder → value map for variable replacement.
      *
-     * Combines built-in variables with those provided by registered [TemplateVariableProvider]s.
+     * Delegates to the [TemplateVariableRegistry] which aggregates variables
+     * from all registered providers, including [DefaultTemplateVariableProvider].
+     * Providers registered later override earlier ones.
      */
     private fun buildVariableMap(
         configuration: Configuration,
         instanceId: String,
         allocatedPort: Int
     ): Map<String, String> {
-        val builtIn = mapOf(
-            "%PORT%" to allocatedPort.toString(),
-            "%INSTANCE_ID%" to instanceId,
-            "%MASTER_IP%" to mainConfiguration.masterAddress,
-            "%MASTER_ADDRESS%" to mainConfiguration.masterAddress,
-            "%MASTER_PORT%" to mainConfiguration.masterPort.toString(),
-            "%MASTER_API_PORT%" to mainConfiguration.masterApiPort.toString(),
-            "%NODE_ID%" to mainConfiguration.nodeId,
-            "%HOST_ADDRESS%" to configuration.hostAddress,
-            "%CONFIGURATION_NAME%" to configuration.name,
-        )
-
-        val custom = variableRegistry.collectVariables()
-
-        // Custom variables take precedence over built-in ones
-        return builtIn + custom
+        return variableRegistry.collectVariables(configuration, instanceId, allocatedPort)
     }
 }

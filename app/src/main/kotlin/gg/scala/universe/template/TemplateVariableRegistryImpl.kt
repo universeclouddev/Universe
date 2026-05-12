@@ -1,6 +1,7 @@
 package gg.scala.universe.template
 
 import com.google.inject.Singleton
+import gg.scala.universe.schema.Configuration
 
 /**
  * Guice-managed implementation of [TemplateVariableRegistry].
@@ -14,10 +15,10 @@ class TemplateVariableRegistryImpl : TemplateVariableRegistry {
         providers.add(provider)
     }
 
-    override fun collectVariables(): Map<String, String> {
+    override fun collectVariables(configuration: Configuration, instanceId: String, allocatedPort: Int): Map<String, String> {
         val result = mutableMapOf<String, String>()
         providers.forEach { provider ->
-            result.putAll(provider.provideVariables())
+            result.putAll(provider.provideVariables(configuration, instanceId, allocatedPort))
         }
         return result
     }

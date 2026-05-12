@@ -36,6 +36,20 @@ class ClusterStateService @Inject constructor(
         return instances.values
     }
 
+    /**
+     * Returns all instances, filtering out those that have been OFFLINE for more than [staleThresholdMs].
+     */
+    fun getActiveInstances(staleThresholdMs: Long = 15000): Collection<InstanceInfo> {
+        val now = System.currentTimeMillis()
+        return instances.values.filter { instance ->
+            if (instance.state == InstanceState.OFFLINE) {
+                now - instance.lastHeartbeat <= staleThresholdMs
+            } else {
+                true
+            }
+        }
+    }
+
     fun putInstance(info: InstanceInfo) {
         instances[info.id] = info
     }

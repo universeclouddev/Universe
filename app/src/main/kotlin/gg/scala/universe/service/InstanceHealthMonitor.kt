@@ -59,7 +59,9 @@ class InstanceHealthMonitor @Inject constructor(
 
             for (instance in instances) {
                 val config = clusterStateService.getConfiguration(instance.configurationName)
-                val runtimeKey = config?.runtime ?: instance.configurationName
+                // Use the runtime stored at instance creation time so config reloads
+                // don't cause us to check the wrong runtime provider.
+                val runtimeKey = instance.runtime
                 val runtimeProvider = runtimeRegistry.get(runtimeKey)
 
                 if (runtimeProvider == null) {
@@ -100,8 +102,12 @@ class InstanceHealthMonitor @Inject constructor(
             }
         }
 
-        // Mark OFFLINE
-        clusterStateService.updateInstanceState(instance.id, InstanceState.OFFLINE)
+        // Mark OFFLINE with updated heartbeat so we know when it went offline
+        val updated = instance.copy(
+            state = InstanceState.OFFLINE,
+            lastHeartbeat = System.currentTimeMillis()
+        )
+        clusterStateService.putInstance(updated)
         log("Instance ${instance.id} marked OFFLINE and resources released", LogType.INFORMATION)
     }
 }

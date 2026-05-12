@@ -56,7 +56,8 @@ class InstanceCreationService @Inject constructor(
             lastHeartbeat = System.currentTimeMillis(),
             processPid = null,
             allocatedRamMB = configuration.ramMB,
-            allocatedCpu = configuration.cpu
+            allocatedCpu = configuration.cpu,
+            runtime = configuration.runtime
         )
 
         clusterStateService.putInstance(instanceInfo)

@@ -75,26 +75,58 @@ class ManagementCommands @Inject constructor(
         }
     }
 
+    @Command("node info")
+    fun nodeInfo(source: CommandSource) {
+        val localMember = hazelcastInstance.cluster.localMember
+        val nodeId = localMember.nodeName()
+        val resources = clusterStateService.getNodeResources(nodeId)
+        val maxRam = localMember.getAttribute("maxRamMB")?.toIntOrNull() ?: 0
+        val maxCpu = localMember.getAttribute("maxCpu")?.toIntOrNull() ?: 0
+
+        source.sendMessage("=== Local Node: $nodeId ===")
+        source.sendMessage("  RAM: ${resources.usedRamMB}MB / ${maxRam}MB used")
+        source.sendMessage("  CPU: ${resources.usedCpu} / ${maxCpu} units used")
+        source.sendMessage("  Instances: ${clusterStateService.getInstancesByWrapper(nodeId).size}")
+    }
+
+    @Command("node resources")
+    fun nodeResources(source: CommandSource) {
+        val members = hazelcastInstance.cluster.members
+        source.sendMessage("=== Node Resources ===")
+        source.sendMessage(String.format("%-12s %-10s %-10s %-10s %-10s", "Node", "RAM Used", "RAM Max", "CPU Used", "CPU Max"))
+        members.forEach { member ->
+            val nodeId = member.nodeName()
+            val resources = clusterStateService.getNodeResources(nodeId)
+            val maxRam = member.getAttribute("maxRamMB")?.toIntOrNull() ?: 0
+            val maxCpu = member.getAttribute("maxCpu")?.toIntOrNull() ?: 0
+            source.sendMessage(
+                String.format("%-12s %-10d %-10d %-10d %-10d", nodeId, resources.usedRamMB, maxRam, resources.usedCpu, maxCpu)
+            )
+        }
+    }
+
     // ─── Instance Commands ───
 
     @Command("instance|instances list")
     fun instanceList(source: CommandSource) {
-        val instances = clusterStateService.getAllInstances()
+        val instances = clusterStateService.getActiveInstances()
         if (instances.isEmpty()) {
             source.sendMessage("No instances found.")
             return
         }
 
         source.sendMessage("=== Instances (${instances.size}) ===")
-        source.sendMessage(String.format("%-10s %-12s %-15s %-8s %-10s", "ID", "Config", "Host", "Port", "State"))
+        source.sendMessage(String.format("%-10s %-12s %-10s %-15s %-8s %-10s", "ID", "Config", "Runtime", "Host", "Port", "State"))
         instances.forEach { instance ->
             val config = clusterStateService.getConfiguration(instance.configurationName)
+            val runtime = instance.runtime
             val staticMarker = if (config?.static == true) " [STATIC]" else ""
             source.sendMessage(
                 String.format(
-                    "%-10s %-12s %-15s %-8d %-10s%s",
+                    "%-10s %-12s %-10s %-15s %-8d %-10s%s",
                     instance.id,
                     instance.configurationName,
+                    runtime,
                     instance.hostAddress,
                     instance.allocatedPort,
                     instance.state,
@@ -197,6 +229,7 @@ class ManagementCommands @Inject constructor(
 
         source.sendMessage("=== Instance $instanceId ===")
         source.sendMessage("  Configuration: ${instance.configurationName}")
+        source.sendMessage("  Runtime: ${config?.runtime ?: "default"}")
         source.sendMessage("  Static: $isStatic")
         source.sendMessage("  State: ${instance.state}")
         source.sendMessage("  Host: ${instance.hostAddress}:${instance.allocatedPort}")
@@ -230,6 +263,98 @@ class ManagementCommands @Inject constructor(
         source.sendMessage("Executed command on instance $instanceId: $command")
     }
 
+    @Command("instance|instances restart <id>")
+    fun instanceRestart(
+        source: CommandSource,
+        @Argument("id") instanceId: String
+    ) {
+        val instance = clusterStateService.getInstance(instanceId)
+        if (instance == null) {
+            source.sendMessage("Instance '$instanceId' not found.")
+            return
+        }
+
+        val config = clusterStateService.getConfiguration(instance.configurationName)
+        if (config == null) {
+            source.sendMessage("Configuration '${instance.configurationName}' not found.")
+            return
+        }
+
+        // Stop existing
+        val member = hazelcastInstance.cluster.members.firstOrNull {
+            it.uuid.toString() == instance.wrapperNodeId
+        } ?: hazelcastInstance.cluster.localMember
+        taskDispatcher.dispatchStop(instanceId, member)
+        source.sendMessage("Stopping instance $instanceId for restart...")
+
+        // Wait a moment for stop to process
+        Thread.sleep(500)
+
+        // Create new
+        val newInstance = if (config.static) {
+            instanceCreationService.createInstance(config, instanceId)
+        } else {
+            instanceCreationService.createInstance(config)
+        }
+
+        if (newInstance == null) {
+            source.sendMessage("Failed to restart instance: no node has enough resources.")
+            return
+        }
+
+        source.sendMessage("Restarted instance as ${newInstance.id} on node ${newInstance.wrapperNodeId}")
+    }
+
+    @Command("instance|instances kill <id>")
+    fun instanceKill(
+        source: CommandSource,
+        @Argument("id") instanceId: String
+    ) {
+        val instance = clusterStateService.getInstance(instanceId)
+        if (instance == null) {
+            source.sendMessage("Instance '$instanceId' not found.")
+            return
+        }
+
+        val member = hazelcastInstance.cluster.members.firstOrNull {
+            it.uuid.toString() == instance.wrapperNodeId
+        } ?: hazelcastInstance.cluster.localMember
+
+        taskDispatcher.dispatchStop(instanceId, member)
+        clusterStateService.updateInstanceState(instanceId, InstanceState.STOPPED)
+        source.sendMessage("Force-killed instance $instanceId.")
+    }
+
+    @Command("instance|instances logs <id>")
+    fun instanceLogs(
+        source: CommandSource,
+        @Argument("id") instanceId: String
+    ) {
+        val instance = clusterStateService.getInstance(instanceId)
+        if (instance == null) {
+            source.sendMessage("Instance '$instanceId' not found.")
+            return
+        }
+
+        val config = clusterStateService.getConfiguration(instance.configurationName)
+        val workingDir = if (config?.static == true) {
+            java.nio.file.Paths.get("./static/${instance.configurationName}")
+        } else {
+            java.nio.file.Paths.get("./running/$instanceId")
+        }
+
+        val logFile = workingDir.resolve("stdout.log").toFile()
+        if (!logFile.exists()) {
+            source.sendMessage("No logs found for instance $instanceId.")
+            return
+        }
+
+        val lines = logFile.readLines()
+        val tail = lines.takeLast(25)
+        source.sendMessage("=== Last ${tail.size} lines of $instanceId ===")
+        tail.forEach { source.sendMessage(it) }
+    }
+
     // ─── Configuration Commands ───
 
     @Command("config|configs list")
@@ -244,6 +369,54 @@ class ManagementCommands @Inject constructor(
         configs.forEach { config ->
             source.sendMessage("  ${config.name} (runtime=${config.runtime}, ports=${config.availablePorts.min}-${config.availablePorts.max})")
         }
+    }
+
+    @Command("config|configs show <name>")
+    fun configShow(
+        source: CommandSource,
+        @Argument("name") configName: String
+    ) {
+        val config = clusterStateService.getConfiguration(configName)
+        if (config == null) {
+            source.sendMessage("Configuration '$configName' not found.")
+            return
+        }
+
+        source.sendMessage("=== Configuration: $configName ===")
+        source.sendMessage("  Runtime: ${config.runtime}")
+        source.sendMessage("  Command: ${config.command}")
+        source.sendMessage("  Static: ${config.static}")
+        source.sendMessage("  RAM: ${config.ramMB}MB")
+        source.sendMessage("  CPU: ${config.cpu}")
+        source.sendMessage("  Min Count: ${config.minimumServiceCount}")
+        source.sendMessage("  Ports: ${config.availablePorts.min}-${config.availablePorts.max}")
+        source.sendMessage("  Groups: ${config.instanceGroups}")
+        source.sendMessage("  Nodes: ${config.nodes}")
+        source.sendMessage("  Host: ${config.hostAddress}")
+        source.sendMessage("  Env: ${config.environmentVariables}")
+        source.sendMessage("  Properties: ${config.properties}")
+        source.sendMessage("  File Mods: ${config.fileModifications}")
+    }
+
+    @Command("config|configs create <name> <runtime> <command>")
+    fun configCreate(
+        source: CommandSource,
+        @Argument("name") configName: String,
+        @Argument("runtime") runtime: String,
+        @Argument("command") command: String
+    ) {
+        if (clusterStateService.getConfiguration(configName) != null) {
+            source.sendMessage("Configuration '$configName' already exists.")
+            return
+        }
+
+        val config = gg.scala.universe.schema.Configuration(
+            name = configName,
+            runtime = runtime,
+            command = command
+        )
+        clusterStateService.putConfiguration(config)
+        source.sendMessage("Created configuration '$configName' (runtime=$runtime).")
     }
 
     @Command("config|configs reload")
@@ -297,23 +470,38 @@ class ManagementCommands @Inject constructor(
 
     // ─── System Commands ───
 
+    @Command("stop|exit")
+    fun stop(source: CommandSource) {
+        source.sendMessage("Shutting down Universe...")
+        Runtime.getRuntime().exit(0)
+    }
+
     @Command("help")
     fun help(source: CommandSource) {
         source.sendMessage("=== Universe Commands ===")
         source.sendMessage("")
         source.sendMessage("Cluster:")
-        source.sendMessage("  cluster status         - Show cluster status")
-        source.sendMessage("  cluster nodes          - List cluster nodes")
+        source.sendMessage("  cluster status          - Show cluster status")
+        source.sendMessage("  cluster nodes           - List cluster nodes")
+        source.sendMessage("")
+        source.sendMessage("Node:")
+        source.sendMessage("  node info               - Show local node resources")
+        source.sendMessage("  node resources          - Show all nodes resource usage")
         source.sendMessage("")
         source.sendMessage("Instances:")
         source.sendMessage("  instances list          - List all instances")
-        source.sendMessage("  instances create <cfg> <amount>  - Create new instances")
+        source.sendMessage("  instances create <cfg> [amount]  - Create new instances")
         source.sendMessage("  instances stop <id>     - Stop an instance")
+        source.sendMessage("  instances kill <id>     - Force-stop an instance")
+        source.sendMessage("  instances restart <id>  - Restart an instance")
         source.sendMessage("  instances info <id>     - Show instance details")
-        source.sendMessage("  instances execute <id>  - Execute command on instance")
+        source.sendMessage("  instances logs <id>     - Show last 25 log lines")
+        source.sendMessage("  instances execute <id> <cmd>  - Execute command on instance")
         source.sendMessage("")
         source.sendMessage("Configuration:")
         source.sendMessage("  configs list            - List configurations")
+        source.sendMessage("  configs show <name>     - Show configuration details")
+        source.sendMessage("  configs create <n> <rt> <cmd>  - Create a configuration")
         source.sendMessage("  configs reload          - Reload configurations from disk")
         source.sendMessage("")
         source.sendMessage("Templates:")
@@ -325,8 +513,8 @@ class ManagementCommands @Inject constructor(
         source.sendMessage("  extensions reload       - Reload extensions")
         source.sendMessage("")
         source.sendMessage("System:")
-        source.sendMessage("  help                   - Show this help")
-        source.sendMessage("  stop                   - Shutdown Universe")
+        source.sendMessage("  help                    - Show this help")
+        source.sendMessage("  stop                    - Shutdown Universe")
     }
 
 }

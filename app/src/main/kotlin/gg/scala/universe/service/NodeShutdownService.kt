@@ -45,7 +45,9 @@ class NodeShutdownService @Inject constructor(
 
         for (instance in localInstances) {
             val config = clusterStateService.getConfiguration(instance.configurationName)
-            val runtimeKey = config?.runtime ?: instance.configurationName
+            // Use the runtime stored at instance creation time so config reloads
+            // don't cause us to stop instances with the wrong provider.
+            val runtimeKey = instance.runtime
             val runtimeProvider = runtimeRegistry.get(runtimeKey)
                 ?: runtimeRegistry.getAll().values.firstOrNull()
 
