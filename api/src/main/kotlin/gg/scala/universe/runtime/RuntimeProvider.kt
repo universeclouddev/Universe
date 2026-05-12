@@ -1,5 +1,6 @@
 package gg.scala.universe.runtime
 
+import gg.scala.universe.schema.TemplateInstallationConfig
 import java.nio.file.Path
 
 /**
@@ -18,9 +19,19 @@ interface RuntimeProvider {
      * @param command The command string to execute.
      * @param ramMB Maximum RAM the instance may use (in megabytes). Zero means unlimited.
      * @param cpu Maximum CPU units the instance may use. Zero means unlimited.
+     * @param templateConfig Optional template installation config. Runtimes that support
+     *        init containers (e.g., K8s) can use this to pre-populate the working directory.
      * @return A [ProcessHandle] representing the started process.
      */
-    fun start(instanceId: String, workingDir: Path, port: Int, command: String, ramMB: Int, cpu: Int): ProcessHandle
+    fun start(
+        instanceId: String,
+        workingDir: Path,
+        port: Int,
+        command: String,
+        ramMB: Int,
+        cpu: Int,
+        templateConfig: TemplateInstallationConfig? = null
+    ): ProcessHandle
 
     /**
      * Stops the process associated with the given instance.
@@ -44,4 +55,10 @@ interface RuntimeProvider {
      * @param instanceId Unique 6-character identifier for the instance.
      */
     fun isRunning(instanceId: String): Boolean
+
+    /**
+     * Returns a list of instance IDs currently managed by this runtime.
+     * Used for instance recovery after node restart.
+     */
+    fun listRunningInstances(): List<String> = emptyList()
 }
