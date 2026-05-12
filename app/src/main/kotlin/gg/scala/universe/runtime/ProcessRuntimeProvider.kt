@@ -18,7 +18,15 @@ class ProcessRuntimeProvider : RuntimeProvider {
 
     private val processes = ConcurrentHashMap<String, Process>()
 
-    override fun start(instanceId: String, workingDir: Path, port: Int, command: String, ramMB: Int, cpu: Int): ProcessHandle {
+    override fun start(
+        instanceId: String,
+        workingDir: Path,
+        port: Int,
+        command: String,
+        ramMB: Int,
+        cpu: Int,
+        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?
+    ): ProcessHandle {
         if (command.isBlank()) {
             throw IllegalArgumentException("Command is blank for instance $instanceId")
         }
@@ -70,5 +78,9 @@ class ProcessRuntimeProvider : RuntimeProvider {
     override fun isRunning(instanceId: String): Boolean {
         val process = processes[instanceId] ?: return false
         return process.isAlive
+    }
+
+    override fun listRunningInstances(): List<String> {
+        return processes.keys.toList()
     }
 }

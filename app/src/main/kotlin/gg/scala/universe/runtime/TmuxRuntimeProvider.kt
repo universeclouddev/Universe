@@ -17,7 +17,15 @@ class TmuxRuntimeProvider : RuntimeProvider {
 
     private val sessions = ConcurrentHashMap<String, ProcessHandle>()
 
-    override fun start(instanceId: String, workingDir: Path, port: Int, command: String, ramMB: Int, cpu: Int): ProcessHandle {
+    override fun start(
+        instanceId: String,
+        workingDir: Path,
+        port: Int,
+        command: String,
+        ramMB: Int,
+        cpu: Int,
+        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?
+    ): ProcessHandle {
         val sessionName = sessionName(instanceId)
 
         // Ensure any stale session with this name is cleaned up first
@@ -69,6 +77,20 @@ class TmuxRuntimeProvider : RuntimeProvider {
                 .waitFor() == 0
         } catch (_: Exception) {
             false
+        }
+    }
+
+    override fun listRunningInstances(): List<String> {
+        return try {
+            val process = ProcessBuilder("tmux", "list-sessions", "-F", "#S")
+                .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+            val output = process.inputStream.bufferedReader().readLines()
+            process.waitFor()
+            output.filter { it.startsWith("universe-") }.map { it.removePrefix("universe-") }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 

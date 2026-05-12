@@ -34,7 +34,15 @@ class DockerRuntimeProvider(
     private val dockerClient: DockerClient = createDockerClient()
     private val containerIds = ConcurrentHashMap<String, String>()
 
-    override fun start(instanceId: String, workingDir: Path, port: Int, command: String, ramMB: Int, cpu: Int): ProcessHandle {
+    override fun start(
+        instanceId: String,
+        workingDir: Path,
+        port: Int,
+        command: String,
+        ramMB: Int,
+        cpu: Int,
+        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?
+    ): ProcessHandle {
         val containerName = "universe-$instanceId"
 
         // Ensure no stale container with this name exists
@@ -189,6 +197,20 @@ class DockerRuntimeProvider(
             info.state.running ?: false
         } catch (_: Exception) {
             false
+        }
+    }
+
+    override fun listRunningInstances(): List<String> {
+        return try {
+            dockerClient.listContainersCmd()
+                .withShowAll(false)
+                .exec()
+                .mapNotNull { container ->
+                    container.names?.firstOrNull()?.removePrefix("/")?.takeIf { it.startsWith("universe-") }
+                        ?.removePrefix("universe-")
+                }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 

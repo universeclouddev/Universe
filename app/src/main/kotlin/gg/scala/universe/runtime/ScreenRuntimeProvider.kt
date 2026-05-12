@@ -17,7 +17,15 @@ class ScreenRuntimeProvider : RuntimeProvider {
 
     private val sessions = ConcurrentHashMap<String, ProcessHandle>()
 
-    override fun start(instanceId: String, workingDir: Path, port: Int, command: String, ramMB: Int, cpu: Int): ProcessHandle {
+    override fun start(
+        instanceId: String,
+        workingDir: Path,
+        port: Int,
+        command: String,
+        ramMB: Int,
+        cpu: Int,
+        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?
+    ): ProcessHandle {
         val sessionName = sessionName(instanceId)
 
         // Ensure any stale session with this name is cleaned up first
@@ -72,6 +80,24 @@ class ScreenRuntimeProvider : RuntimeProvider {
             output.contains(sessionName)
         } catch (_: Exception) {
             false
+        }
+    }
+
+    override fun listRunningInstances(): List<String> {
+        return try {
+            val process = ProcessBuilder("screen", "-ls")
+                .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+            val output = process.inputStream.bufferedReader().readText()
+            process.waitFor()
+            output.lines()
+                .filter { it.contains("universe-") }
+                .mapNotNull { line ->
+                    Regex("universe-([a-zA-Z0-9]+)").find(line)?.groupValues?.get(1)
+                }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 

@@ -7,13 +7,16 @@ import cz.lukynka.prettylog.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.runtime.PortAllocator
 import gg.scala.universe.runtime.RuntimeRegistry
+import gg.scala.universe.schema.InstanceInfo
 import gg.scala.universe.schema.InstanceState
 import gg.scala.universe.task.DeployInstanceTask
 import gg.scala.universe.task.ExecuteCommandTask
 import gg.scala.universe.task.StopInstanceTask
 import gg.scala.universe.task.UniverseTask
 import gg.scala.universe.template.TemplateManager
+import gg.scala.universe.util.json.Serializers
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.Comparator
 
@@ -67,7 +70,8 @@ class TaskRouter @Inject constructor(
                 port = allocatedPort,
                 command = configuration.command,
                 ramMB = configuration.ramMB,
-                cpu = configuration.cpu
+                cpu = configuration.cpu,
+                templateConfig = configuration.templateInstallationConfig
             )
         } catch (e: Exception) {
             val cause = e.cause ?: e
@@ -102,7 +106,8 @@ class TaskRouter @Inject constructor(
                 existing.copy(
                     state = InstanceState.ONLINE,
                     allocatedPort = allocatedPort,
-                    processPid = processHandle.pid()
+                    processPid = processHandle.pid(),
+                    runtime = configuration.runtime
                 )
             )
         }
@@ -110,6 +115,21 @@ class TaskRouter @Inject constructor(
         // Track node resources
         val nodeId = existing?.wrapperNodeId ?: task.instanceId
         clusterStateService.addNodeResources(nodeId, configuration.ramMB, configuration.cpu)
+
+        // Write state file for recovery after node restart
+        writeStateFile(workingDir, existing?.copy(runtime = configuration.runtime) ?: InstanceInfo(
+            id = task.instanceId,
+            configurationName = configuration.name,
+            wrapperNodeId = nodeId,
+            hostAddress = configuration.hostAddress,
+            allocatedPort = allocatedPort,
+            state = InstanceState.ONLINE,
+            lastHeartbeat = System.currentTimeMillis(),
+            processPid = processHandle.pid(),
+            allocatedRamMB = configuration.ramMB,
+            allocatedCpu = configuration.cpu,
+            runtime = configuration.runtime
+        ))
 
         log("Instance ${task.instanceId} deployed with PID ${processHandle.pid()}", LogType.SUCCESS)
     }
@@ -120,12 +140,26 @@ class TaskRouter @Inject constructor(
         val instance = clusterStateService.getInstance(task.instanceId)
             ?: return log("Instance ${task.instanceId} not found", LogType.WARNING)
 
-        val configuration = clusterStateService.getConfiguration(instance.configurationName)
-        val runtimeKey = configuration?.runtime ?: instance.configurationName
+        // Use the runtime that was stored at instance creation time, not the current config,
+        // so config reloads/changes don't break stopping existing instances.
+        val runtimeKey = instance.runtime
 
         val runtimeProvider = runtimeRegistry.get(runtimeKey)
             ?: runtimeRegistry.getAll().values.firstOrNull()
-            ?: return log("No runtime provider available to stop instance ${task.instanceId}", LogType.ERROR)
+            ?: return log("No runtime provider '$runtimeKey' available to stop instance ${task.instanceId}", LogType.ERROR)
+
+        val configuration = clusterStateService.getConfiguration(instance.configurationName)
+
+        // Try graceful shutdown first (e.g., send "stop" to a Minecraft server)
+        try {
+            if (runtimeProvider.isRunning(task.instanceId)) {
+                runtimeProvider.executeCommand(task.instanceId, "stop")
+                log("Sent graceful stop command to instance ${task.instanceId}, waiting 30s...", LogType.INFORMATION)
+                Thread.sleep(30000)
+            }
+        } catch (e: Exception) {
+            log("Graceful stop failed for instance ${task.instanceId}: ${e.message}, forcing...", LogType.WARNING)
+        }
 
         runtimeProvider.stop(task.instanceId)
         portAllocator.release(instance.allocatedPort)
@@ -133,6 +167,7 @@ class TaskRouter @Inject constructor(
         // Clean up working directory (skip for static instances)
         if (configuration?.static != true) {
             val workingDir = Paths.get("./running/${task.instanceId}").toAbsolutePath().normalize()
+            deleteStateFile(workingDir)
             try {
                 if (Files.exists(workingDir)) {
                     Files.walk(workingDir)
@@ -166,5 +201,24 @@ class TaskRouter @Inject constructor(
             ?: return log("No runtime provider available to execute command on instance ${task.instanceId}", LogType.ERROR)
 
         runtimeProvider.executeCommand(task.instanceId, task.command)
+    }
+
+    private fun writeStateFile(workingDir: Path, instance: InstanceInfo) {
+        try {
+            val stateFile = workingDir.resolve(".universe-state.json")
+            val json = Serializers.GSON.toJson(instance)
+            Files.writeString(stateFile, json)
+        } catch (e: Exception) {
+            log("Failed to write state file for instance ${instance.id}: ${e.message}", LogType.WARNING)
+        }
+    }
+
+    private fun deleteStateFile(workingDir: Path) {
+        try {
+            val stateFile = workingDir.resolve(".universe-state.json")
+            Files.deleteIfExists(stateFile)
+        } catch (_: Exception) {
+            // ignored
+        }
     }
 }
