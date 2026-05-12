@@ -1,0 +1,84 @@
+package gg.scala.universe.k8s
+
+/**
+ * Configuration for the Kubernetes runtime extension.
+ */
+data class K8sConfig(
+    val factoryName: String = "kube",
+    val namespace: String = "default",
+    val image: String = "azul-zulu:25-jdk-alpine",
+    val imagePullPolicy: String = "IfNotPresent",
+    val workingDir: String = "/app",
+    val restartPolicy: String = "Never",
+    val serviceAccount: String? = null,
+    val nodeSelector: Map<String, String> = emptyMap(),
+    val tolerations: List<K8sTolerationConfig> = emptyList(),
+    val env: Map<String, String> = emptyMap(),
+    val labels: Map<String, String> = emptyMap(),
+    val annotations: Map<String, String> = emptyMap(),
+    val volumes: List<K8sVolumeConfig> = emptyList(),
+    val volumeMounts: List<K8sVolumeMountConfig> = emptyList(),
+    val kubeConfigPath: String? = null,
+    val masterUrl: String? = null,
+    val timeoutSeconds: Int = 30,
+    /**
+     * Host filesystem path that corresponds to the Universe data directory.
+     * Required when Universe itself runs inside a Docker container, because
+     * K8s hostPath volumes are resolved on the host filesystem.
+     *
+     * Example: Universe container mounts `./data:/data` via docker-compose,
+     * and compose.yaml lives at `/opt/universe`. Then set:
+     * hostDataPath = "/opt/universe/data"
+     */
+    val hostDataPath: String? = null,
+
+    /**
+     * When true and hostDataPath is null (cloud mode), the K8s extension
+     * auto-generates an init container that downloads templates from S3
+     * before the main container starts.
+     *
+     * Requires the S3 storage extension to be enabled so credentials can
+     * be read from `./extensions/s3/config.json`.
+     */
+    val s3TemplateInit: Boolean = true,
+
+    /**
+     * Container image used for the S3 template init container.
+     * Must provide `aws` CLI and `unzip`.
+     */
+    val s3InitImage: String = "amazon/aws-cli:latest",
+
+    /**
+     * S3 bucket override. If null, the extension reads the bucket from
+     * the S3 extension's config (`./extensions/s3/config.json`).
+     */
+    val s3Bucket: String? = null,
+
+    /**
+     * S3 prefix override for template keys. If null, uses the S3
+     * extension's configured prefix (defaults to `templates/`).
+     */
+    val s3Prefix: String? = null
+)
+
+data class K8sTolerationConfig(
+    val key: String,
+    val operator: String = "Equal",
+    val value: String? = null,
+    val effect: String = "NoSchedule"
+)
+
+data class K8sVolumeConfig(
+    val name: String,
+    val hostPath: String? = null,
+    val emptyDir: Boolean = false,
+    val configMapName: String? = null,
+    val secretName: String? = null,
+    val claimName: String? = null
+)
+
+data class K8sVolumeMountConfig(
+    val name: String,
+    val mountPath: String,
+    val readOnly: Boolean = false
+)
