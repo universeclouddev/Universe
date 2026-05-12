@@ -43,6 +43,11 @@ dependencies {
         exclude(group = "org.jetbrains.kotlin")
         exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
     }
+
+    // jline for console tab completion
+    runtimeDownload(libs.bundles.jline) {
+        exclude(group = "org.jetbrains.kotlin")
+    }
 }
 
 tasks.shadowJar {

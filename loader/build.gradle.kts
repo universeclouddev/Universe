@@ -55,14 +55,16 @@ jib {
             "java",
             "--add-opens=java.base/java.time=ALL-UNNAMED",
             "--add-opens=java.base/java.net=ALL-UNNAMED",
+            "--add-opens=java.base/java.io=ALL-UNNAMED",
             "--enable-native-access=ALL-UNNAMED",
             "--add-modules=java.se",
             "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
             "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.nio=ALL-UNNAMED",
+            "--add-exports=java.base/sun.misc=ALL-UNNAMED",
             "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
             "--add-opens=java.management/sun.management=ALL-UNNAMED",
             "--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED",
-            "-Dterminal.jline=false", "-Dterminal.ansi=true",
             "-jar", "/app/universe.jar"
         )
 
