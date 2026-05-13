@@ -27,6 +27,12 @@ java {
 }
 
 tasks {
+    processResources {
+        filesMatching("plugin.yml") {
+            expand(mapOf("version" to project.version))
+        }
+    }
+
     shadowJar {
         archiveClassifier.set("")
         archiveVersion.set("")

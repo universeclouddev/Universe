@@ -19,7 +19,7 @@ import java.nio.file.Path
 @Plugin(
     id = "universe",
     name = "Universe",
-    version = "1.0.0",
+    version = "0.0.1",
     description = "Auto-registers Universe instances as Velocity backends",
     authors = ["Scala Universe"]
 )
