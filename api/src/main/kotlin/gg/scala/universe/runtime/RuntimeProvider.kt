@@ -21,6 +21,8 @@ interface RuntimeProvider {
      * @param cpu Maximum CPU units the instance may use. Zero means unlimited.
      * @param templateConfig Optional template installation config. Runtimes that support
      *        init containers (e.g., K8s) can use this to pre-populate the working directory.
+     * @param environmentVariables Optional environment variables to set for the process.
+     *        Values may contain template placeholders that have already been replaced.
      * @return A [ProcessHandle] representing the started process.
      */
     fun start(
@@ -30,7 +32,8 @@ interface RuntimeProvider {
         command: String,
         ramMB: Int,
         cpu: Int,
-        templateConfig: TemplateInstallationConfig? = null
+        templateConfig: TemplateInstallationConfig? = null,
+        environmentVariables: Map<String, String>? = null
     ): ProcessHandle
 
     /**
