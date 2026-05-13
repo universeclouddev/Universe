@@ -61,8 +61,13 @@ Artifacts are copied to `.built/` after build.
 | `loader` | Bootstrap classloader that downloads runtime deps and launches `app` |
 | `extensions/extension-api` | Extension-facing interfaces (`Extension`, `TemplateStorageProvider`, etc.) |
 | `extensions/runtime-docker` | Docker container runtime provider |
+| `extensions/runtime-k8s` | Kubernetes Pod runtime provider |
 | `extensions/storage-s3` | AWS S3 template storage backend |
 | `extensions/example` | Reference extension implementation |
+| `minecraft/minecraft-api` | JVM 8 compatible public API for Minecraft plugin developers |
+| `minecraft/minecraft-modern` | Paper 1.21.4+ plugin with MiniMessage support |
+| `minecraft/minecraft-legacy` | Spigot 1.8.8 plugin with legacy color codes |
+| `minecraft/minecraft-velocity` | Velocity 3.5.0 proxy plugin |
 
 ## Running
 
@@ -222,6 +227,26 @@ All commands work both in the console and via `POST /api/commands/execute`.
 | `POST` | `/api/instances` | Create instance from configuration |
 | `PUT` | `/api/instances/{id}/state` | Update instance state and heartbeat |
 | `POST` | `/api/commands/execute` | Execute console command, return output |
+| `DELETE` | `/api/instances/{id}` | Stop and remove an instance |
+| `PATCH` | `/api/instances/{id}/lifecycle?target=start|stop|restart` | Lifecycle control |
+| `POST` | `/api/instances/{id}/execute` | Send command to instance stdin |
+| `GET` | `/api/instances/{id}/logs?lines=100` | Retrieve last N log lines |
+| `WS` | `/api/instances/{id}/live-log` | WebSocket live log streaming |
+| `GET` | `/api/ping` | Health check |
+| `GET` | `/api/node` | Node info (version, resources, uptime) |
+| `GET` | `/api/node/config` | Node configuration |
+| `POST` | `/api/node/reload` | Reload node configuration |
+| `WS` | `/api/console` | Interactive console WebSocket (master only) |
+| `GET` | `/api/cluster/nodes` | List all cluster nodes |
+| `GET` | `/api/cluster/nodes/{id}` | Node details with instances |
+| `POST` | `/api/cluster/nodes/{id}/command` | Execute command on remote node |
+| `GET` | `/api/configurations` | List all configurations |
+| `GET` | `/api/configurations/{name}` | Get configuration by name |
+| `PUT` | `/api/configurations/{name}` | Create or update configuration |
+| `DELETE` | `/api/configurations/{name}` | Delete configuration |
+| `GET` | `/api/templates` | List all templates |
+| `GET` | `/api/templates/{group}/{name}` | Get template info |
+| `POST` | `/api/templates/sync` | Sync templates matching pattern to all nodes |
 
 ## Templates
 
@@ -279,6 +304,59 @@ class MyExtension : Extension {
 s3 upload server/base      # upload template to S3
 s3 download server/base    # download template from S3
 ```
+
+## Minecraft Plugins
+
+Universe provides first-class Minecraft integration through a standalone `:minecraft:api` module and three platform-specific plugins.
+
+### `:minecraft:api` — Plugin Developer API
+
+- **JVM 8 compatible**, zero external dependencies
+- Provides `UniverseAPI` with `InstanceManager`, `ConfigurationManager`, and `TemplateManager`
+- All async operations return `CompletableFuture<Optional<T>>` for Java ergonomics
+- Not relocated in shadow JARs so dependent plugins can use API classes at runtime
+
+```kotlin
+// In your plugin's onEnable()
+Universe.register(this)
+
+// Access the API
+val api = Universe.getAPI()
+api.instanceManager.getInstances().thenAccept { instances ->
+    // ...
+}
+```
+
+### Modern Paper Plugin (`minecraft-modern`)
+
+- Targets Paper 1.21.4+
+- Uses **MiniMessage** for all chat formatting (`CC.kt` converts `&` codes internally)
+- Commands: `/universe info`, `/universe players`, `/universe tps`
+- Reports TPS, player count, and max players in heartbeat
+
+### Legacy Spigot Plugin (`minecraft-legacy`)
+
+- Targets Spigot 1.8.8
+- Uses legacy `&` color codes via `ChatColor.translateAlternateColorCodes`
+- Same `/universe` command set adapted for legacy Bukkit API
+
+### Velocity Proxy Plugin (`minecraft-velocity`)
+
+- Targets Velocity 3.5.0
+- Uses MiniMessage via same `CC.kt` pattern as modern
+- Polls instances from Master REST API and auto-registers them as Velocity servers
+- Commands: `/universe info`, `/universe send <player> <server>`
+
+### Building Minecraft Plugins
+
+```bash
+./gradlew :minecraft:minecraft-api:build
+./gradlew :minecraft:minecraft-modern:build
+./gradlew :minecraft:minecraft-legacy:build
+./gradlew :minecraft:minecraft-velocity:build
+```
+
+Shadow JARs are output to `.built/`.
 
 ## Development
 
