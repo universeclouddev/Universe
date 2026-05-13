@@ -4,9 +4,9 @@ import com.google.inject.Guice
 import com.google.inject.Injector
 import com.google.inject.Module
 import com.hazelcast.core.HazelcastInstance
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.PrettyLogSettings
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.Console
+import gg.scala.universe.console.log
+import org.slf4j.LoggerFactory
 import gg.scala.universe.api.ApiGuiceModule
 import gg.scala.universe.api.KtorServerService
 import gg.scala.universe.config.ConfigLoader
@@ -18,6 +18,7 @@ import gg.scala.universe.hz.HazelcastService
 import gg.scala.universe.hz.HzGuiceModule
 import gg.scala.universe.hz.ResilienceMembershipListener
 import gg.scala.universe.command.CommandBootstrap
+import gg.scala.universe.console.LogLevel
 import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.runtime.ProcessRuntimeProvider
 import gg.scala.universe.runtime.ScreenRuntimeProvider
@@ -28,11 +29,13 @@ import gg.scala.universe.service.InstanceRecoveryService
 import gg.scala.universe.service.NodeShutdownService
 
 fun run() {
-    log("Starting Universe", LogType.INFORMATION)
+    log("Starting Universe")
     UniverseApplication()
 }
 
 class UniverseApplication {
+    private val logger = LoggerFactory.getLogger(UniverseApplication::class.java)
+
     var mainConfiguration: UniverseMainConfiguration
 
     val injector: Injector
@@ -44,13 +47,8 @@ class UniverseApplication {
         instance = this
         mainConfiguration = ConfigLoader.load()
 
-        if (!mainConfiguration.debug) {
-            PrettyLogSettings.disabledLogTypes = setOf(LogType.DEBUG, LogType.TRACE, LogType.CONFIG)
-        }
-
-        PrettyLogSettings.saveToFile = true
-        PrettyLogSettings.saveDirectoryPath = "./logs/"
-        PrettyLogSettings.logFileNameFormat = "yyyy-MM-dd-Hms"
+        Console.setDebug(mainConfiguration.debug)
+        configureLogbackLevels(mainConfiguration.debug)
 
         injector = Guice.createInjector(guiceModules)
 
@@ -63,7 +61,7 @@ class UniverseApplication {
         runtimeRegistry.register("tmux", TmuxRuntimeProvider())
         runtimeRegistry.register("screen", ScreenRuntimeProvider())
         runtimeRegistry.register("process", ProcessRuntimeProvider())
-        log("Registered built-in runtime providers (tmux, screen, process)", LogType.INFORMATION)
+        log("Registered built-in runtime providers (tmux, screen, process)")
 
         // Start health monitor on every node (wrappers run instances too)
         val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
@@ -74,15 +72,13 @@ class UniverseApplication {
             hzService.hzInstance.cluster.addMembershipListener(
                 ResilienceMembershipListener(clusterStateService)
             )
-            log("Registered MembershipListener for instance resilience", LogType.INFORMATION)
+            log("Registered MembershipListener for instance resilience")
             ConfigurationLoader.load(clusterStateService)
         }
 
         extensionService = ExtensionService()
         injector.injectMembers(extensionService)
         extensionService.installExtensions()
-
-
         extensionService.loadExtensions()
 
         // Recover instances that were running before restart
@@ -94,22 +90,41 @@ class UniverseApplication {
 
         Runtime.getRuntime().addShutdownHook(Thread({
             try {
-                log("Shutting down Universe...", LogType.INFORMATION)
+                // Stop the console first so JLine terminal is closed cleanly
+                // and stdout/stderr are restored to their originals.
                 commandBootstrap.stop()
+
+                // Use println directly to bypass JLine entirely during shutdown
+                println("  \u001B[34m\u2192\u001B[0m Shutting down Universe...")
+
+                // Stop background services first so they don't race with Hazelcast
+                println("  \u001B[34m\u2192\u001B[0m Stopping background services...")
                 val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
                 healthMonitor.stop()
-                val nodeShutdownService = injector.getInstance(NodeShutdownService::class.java)
-                nodeShutdownService.stopAllLocalInstances()
+
                 if (mainConfiguration.isMasterNode) {
-                    val ktorService = injector.getInstance(KtorServerService::class.java)
-                    ktorService.stop()
                     val enforcer = injector.getInstance(InstanceCountEnforcer::class.java)
                     enforcer.stop()
+                    val ktorService = injector.getInstance(KtorServerService::class.java)
+                    ktorService.stop()
                 }
-                hzService.hzInstance.shutdown()
-                log("Universe shutdown complete", LogType.INFORMATION)
+
+                // Stop local instances (needs Hazelcast)
+                println("  \u001B[34m\u2192\u001B[0m Stopping local instances...")
+                val nodeShutdownService = injector.getInstance(NodeShutdownService::class.java)
+                nodeShutdownService.stopAllLocalInstances()
+
+                // Shutdown Hazelcast last
+                println("  \u001B[34m\u2192\u001B[0m Shutting down Hazelcast cluster...")
+                try {
+                    hzService.hzInstance.shutdown()
+                } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
+                    // Already shut down
+                }
+                println("  \u001B[32m\u2713\u001B[0m Universe shutdown complete")
             } catch (e: Exception) {
-                log("Error during shutdown: ${e.message}", LogType.ERROR)
+                println("  \u001B[31m\u2717\u001B[0m Error during shutdown: ${e.message}")
+                e.printStackTrace()
             }
         }, "universe-shutdown"))
 
@@ -129,5 +144,34 @@ class UniverseApplication {
         )
 
         lateinit var instance: UniverseApplication
+    }
+}
+
+private fun configureLogbackLevels(debug: Boolean) {
+    val loggerContext = LoggerFactory.getILoggerFactory() as? ch.qos.logback.classic.LoggerContext ?: return
+    val root = loggerContext.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME)
+    val appLogger = loggerContext.getLogger("gg.scala.universe")
+
+    val frameworkLoggers = listOf(
+        "com.hazelcast",
+        "io.fabric8.kubernetes",
+        "com.github.dockerjava",
+        "org.apache.http",
+        "software.amazon.awssdk",
+        "io.netty"
+    )
+
+    if (debug) {
+        root.level = ch.qos.logback.classic.Level.INFO
+        appLogger.level = ch.qos.logback.classic.Level.DEBUG
+        frameworkLoggers.forEach { name ->
+            loggerContext.getLogger(name)?.level = ch.qos.logback.classic.Level.INFO
+        }
+    } else {
+        root.level = ch.qos.logback.classic.Level.WARN
+        appLogger.level = ch.qos.logback.classic.Level.WARN
+        frameworkLoggers.forEach { name ->
+            loggerContext.getLogger(name)?.level = ch.qos.logback.classic.Level.WARN
+        }
     }
 }

@@ -2,8 +2,8 @@ package gg.scala.universe.command
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.log
+import gg.scala.universe.console.LogLevel
 import gg.scala.universe.command.commands.ManagementCommands
 import gg.scala.universe.command.commands.TemplateSyncCommand
 import gg.scala.universe.config.UniverseMainConfiguration
@@ -30,6 +30,8 @@ class CommandBootstrap @Inject constructor(
     private var consoleThread: Thread? = null
     private var terminal: Terminal? = null
     private var lineReader: LineReader? = null
+    private var originalOut: java.io.PrintStream? = null
+    private var originalErr: java.io.PrintStream? = null
 
     fun start() {
         commandProvider.register(TemplateSyncCommand::class.java)
@@ -50,7 +52,7 @@ class CommandBootstrap @Inject constructor(
             .build()
 
         val size = terminal?.size
-        log("Terminal type: ${terminal?.type}, size: ${size?.columns}x${size?.rows}", LogType.INFORMATION)
+        log("Terminal type: ${terminal?.type}, size: ${size?.columns}x${size?.rows}")
 
         lineReader = LineReaderBuilder.builder()
             .terminal(terminal)
@@ -75,6 +77,8 @@ class CommandBootstrap @Inject constructor(
             }
 
         // Redirect stdout/stderr through JLine so async logs print above the prompt
+        originalOut = System.out
+        originalErr = System.err
         val jlineOut = createJLinePrintStream(lineReader!!)
         System.setOut(jlineOut)
         System.setErr(jlineOut)
@@ -90,6 +94,9 @@ class CommandBootstrap @Inject constructor(
                         continue
                     } catch (_: EndOfFileException) {
                         break
+                    } catch (_: IllegalStateException) {
+                        // Terminal closed during shutdown — exit cleanly
+                        break
                     }
 
                     if (line.isNullOrBlank()) {
@@ -99,16 +106,16 @@ class CommandBootstrap @Inject constructor(
                     try {
                         commandProvider.execute(consoleSource, line)
                             .exceptionally { throwable ->
-                                log("Error executing command: ${throwable.message}", LogType.ERROR)
+                                log("Error executing command: ${throwable.message}", LogLevel.ERROR)
                                 null
                             }
                     } catch (e: Exception) {
-                        log("Error executing command: ${e.message}", LogType.ERROR)
+                        log("Error executing command: ${e.message}", LogLevel.ERROR)
                     }
                 }
             } catch (e: Exception) {
                 if (!Thread.currentThread().isInterrupted) {
-                    log("Console input error: ${e.message}", LogType.ERROR)
+                    log("Console input error: ${e.message}", LogLevel.ERROR)
                 }
             }
         }, "universe-console").apply {
@@ -118,15 +125,30 @@ class CommandBootstrap @Inject constructor(
     }
 
     fun stop() {
+        // Restore original stdout/stderr first so any post-stop logging
+        // doesn't attempt to write through the JLine terminal we're about to close.
+        val savedOut = originalOut
+        val savedErr = originalErr
+        try {
+            savedOut?.let { System.setOut(it) }
+            savedErr?.let { System.setErr(it) }
+        } catch (_: Exception) { }
+        originalOut = null
+        originalErr = null
+
         try {
             consoleThread?.interrupt()
         } catch (_: Exception) { }
         consoleThread = null
+
+        lineReader = null
+
         try {
             terminal?.close()
+        } catch (_: IllegalStateException) {
+            // Terminal already closed — expected during shutdown
         } catch (_: Exception) { }
         terminal = null
-        lineReader = null
     }
 
     /**
@@ -145,7 +167,12 @@ class CommandBootstrap @Inject constructor(
                     val bytes = buffer.toByteArray()
                     if (bytes.isNotEmpty()) {
                         val line = String(bytes, Charsets.UTF_8)
-                        reader.printAbove(line)
+                        try {
+                            reader.printAbove(line)
+                        } catch (_: IllegalStateException) {
+                            // Terminal closed — write to original stdout as fallback
+                            kotlin.io.println(line)
+                        }
                     }
                     buffer.reset()
                 } else {

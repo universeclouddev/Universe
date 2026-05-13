@@ -4,19 +4,30 @@ import com.google.inject.Inject
 import com.hazelcast.config.Config as HazelcastConfig
 import com.hazelcast.core.Hazelcast
 import com.hazelcast.core.HazelcastInstance
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
 import gg.scala.universe.config.UniverseMainConfiguration
+import gg.scala.universe.console.log
+import org.slf4j.LoggerFactory
 
 class HazelcastService {
+    private val logger = LoggerFactory.getLogger(HazelcastService::class.java)
+
     @Inject lateinit var configuration: UniverseMainConfiguration
 
     lateinit var hzInstance: HazelcastInstance
 
     fun start() {
+        // Force Hazelcast to use SLF4J so it respects our Logback level controls
+
         val hzConfig = HazelcastConfig()
         hzConfig.clusterName = configuration.clusterName
         hzConfig.jetConfig.isEnabled = true
+
+        // set hazelcast logging to slf4j to respect our logback configuration
+        System.setProperty("hazelcast.logging.type", "slf4j")
+        hzConfig.setProperty("hazelcast.logging.type", "slf4j")
+
+        // disable auto shutdown hook - we'll manage shutdown ourselves to ensure proper cleanup
+        hzConfig.setProperty("hazelcast.shutdownhook.enabled", "false")
 
         // Network
         val pubAddress = "${configuration.address}:${configuration.port}"
@@ -36,13 +47,13 @@ class HazelcastService {
         if (configuration.isMasterNode) {
             tcpIpConfig.addMember("127.0.0.1")
 
-            log("🚀 Starting Deployer in MASTER mode on port ${network.port}...", LogType.INFORMATION)
+            log("Starting Universe in MASTER mode on port ${network.port}")
         } else {
             val masterAddress = "${configuration.masterAddress}:${configuration.masterPort}"
             tcpIpConfig.addMember(masterAddress)
             hzConfig.isLiteMember = true
 
-            log("📡 Starting Deployer in WRAPPER mode, connecting to Master at $masterAddress...", LogType.INFORMATION)
+            log("Starting Universe in WRAPPER mode, connecting to Master at $masterAddress")
         }
 
         // Set node ID as a member attribute so it can be read by other members
