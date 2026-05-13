@@ -6,10 +6,11 @@ This document defines the roles, system boundaries, and handoff protocols for th
 * **Responsibility:** Manages the `api` module, the Master Node's state logic, Hazelcast configuration, the HTTP REST API, and the console command system.
 * **System Boundaries:** Operates strictly within the `app` and `api` modules. Knows nothing about Docker or specific terminal multiplexers.
 * **Key Tasks:**
-  - **The REST API:** Implementing a Ktor-based HTTP server on the Master node so external services (like the Minecraft plugin) can report state, create instances, and manage the cluster.
-  - **Schema Updates:** Expanding the `Configuration` and `TemplateInstallationConfig` in `schemas.kt` to support dynamic file editing (`fileModifications: List<String>`, `properties: Map<String, String>`) and port range definitions.
+  - **The REST API:** Implementing a Ktor-based HTTP server on the Master node with CloudNet-inspired endpoints: log retrieval (`GET /api/instances/{id}/logs`), live log WebSocket streaming (`WS /api/instances/{id}/live-log`), node/cluster management (`/api/cluster/nodes`, `/api/node`), instance lifecycle control (`PATCH /api/instances/{id}/lifecycle`), and template sync APIs.
+  - **Schema Updates:** Expanding the `Configuration` and `TemplateInstallationConfig` in `schemas.kt` to support dynamic file editing (`fileModifications: List<String>`, `properties: Map<String, String>`), port range definitions, and `environmentVariables: Map<String, String>`.
   - **State Reconciliation:** Enforcing the rule that when a Wrapper disconnects, the Master marks the Wrapper as offline but *keeps* the `InstanceInfo` active, awaiting the Minecraft plugin's Ktor HTTP ping.
   - **Command System:** Building the Cloud v2-based console command framework (`CommandProvider`, `CommandBootstrap`, `ManagementCommands`) with REST API command execution support.
+  - **WebSocket Support:** Adding `ktor-server-websockets` for live log streaming and interactive master console access.
 
 ## 2. The Integrator (The Wrapper Daemon & Local Runtimes)
 * **Responsibility:** Builds the lightweight execution layer, template management, port allocation, and template synchronization on the Wrapper node.
@@ -25,8 +26,9 @@ This document defines the roles, system boundaries, and handoff protocols for th
 * **System Boundaries:** Only writes code in the `extensions/` directory or in completely separate plugin projects. Extensions must NOT depend on the `:app` module.
 * **Key Tasks:**
   - **Docker Extension:** Creating `extensions/runtime-docker` and registering `DockerRuntimeProvider` under the `"docker"` key.
+  - **K8s Extension:** Creating `extensions/runtime-k8s` and registering `K8sRuntimeProvider` under the `"k8s"` key.
   - **S3 Storage Extension:** Creating `extensions/storage-s3` implementing `TemplateStorageProvider` for remote template storage via AWS SDK v2.
-  - **Minecraft Plugin:** Building the Bukkit/Paper plugin that shades the `api` module, connects to the Master's Ktor REST API, reports server health, and intercepts console commands.
+  - **Minecraft Plugin:** Building three platform plugins (Modern Paper 1.21.4+, Legacy Spigot 1.8.8, Velocity 3.5.0) that shade the `:minecraft:api` module (JVM 8, zero deps), connect to the Master's Ktor REST API, report server health, and intercept console commands.
 
 ## 4. The Reviewer (Quality & Architecture Control)
 * **Responsibility:** Code review, dependency management, and boundary enforcement.
@@ -93,9 +95,11 @@ This document defines the roles, system boundaries, and handoff protocols for th
 - `./extensions/<ext>/config.json` — Extension-specific configs
 
 ## Minecraft Plugin Projects
-- External Bukkit/Paper plugins live under:
-  - `/minecraft/modern` — targets Minecraft 1.21.4+
-  - `/minecraft/legacy` — targets Minecraft 1.8.8
+- External plugins live under:
+  - `/minecraft/modern` — targets Paper 1.21.4+
+  - `/minecraft/legacy` — targets Spigot 1.8.8
+  - `/minecraft/velocity` — targets Velocity 3.5.0
+- `:minecraft:api` is a **JVM 8 compatible, zero-dependency** module for plugin developers. It is NOT relocated in shadow JARs so dependent plugins can find classes at runtime.
 
 ## Reference Libraries & Inspirations
 
