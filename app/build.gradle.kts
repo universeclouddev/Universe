@@ -42,6 +42,9 @@ dependencies {
     runtimeDownload(libs.bundles.jline) {
         exclude(group = "org.jetbrains.kotlin")
     }
+
+    // logback-classic as SLF4J implementation for docker-java / k8s-client / hazelcast logging
+    runtimeDownload(libs.logback.classic)
 }
 
 tasks.shadowJar {
