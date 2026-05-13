@@ -10,6 +10,7 @@ gradle-git-properties = "2.5.7"
 guice = "7.0.0"
 gson = "2.14.0"
 cloud = "2.0.0"
+cloudMinecraft = "2.0.0-beta.10"
 cloudConfirmation = "1.0.0-rc.1"
 guava = "33.6.0-jre"
 pretty-log = "2.0"
@@ -21,6 +22,9 @@ docker-java = "3.7.1"
 aws-sdk = "2.44.4"
 jline = "4.1.0"
 k8s-client = "7.6.1"
+paper = "1.21.4-R0.1-SNAPSHOT"
+spigot-legacy = "1.8.8-R0.1-SNAPSHOT"
+velocity = "3.5.0-SNAPSHOT"
 
 [libraries]
 # dependency download
@@ -63,6 +67,7 @@ ktor-server-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
 ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
 ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor" }
 ktor-server-host-common = { module = "io.ktor:ktor-server-host-common", version.ref = "ktor" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
 
 # docker-java
 docker-java-core = { module = "com.github.docker-java:docker-java-core", version.ref = "docker-java" }
@@ -78,6 +83,16 @@ jline-builtins = { module = "org.jline:jline-builtins", version.ref = "jline" }
 # fabric8 kubernetes client
 k8s-client = { module = "io.fabric8:kubernetes-client", version.ref = "k8s-client" }
 
+# cloud minecraft
+cloud-paper = { module = "org.incendo:cloud-paper", version.ref = "cloudMinecraft" }
+cloud-bukkit = { module = "org.incendo:cloud-bukkit", version.ref = "cloudMinecraft" }
+cloud-velocity = { module = "org.incendo:cloud-velocity", version.ref = "cloudMinecraft" }
+
+# minecraft
+paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper" }
+spigot-api = { module = "org.spigotmc:spigot-api", version.ref = "spigot-legacy" }
+velocity-api = { module = "com.velocitypowered:velocity-api", version.ref = "velocity" }
+
 # other
 
 
@@ -89,7 +104,8 @@ ktor = [
     "ktor-server-core", "ktor-server-netty",
     "ktor-server-content-negotiation", "ktor-server-auth",
     "ktor-server-cors", "ktor-server-status-pages",
-    "ktor-server-call-logging", "ktor-server-host-common"
+    "ktor-server-call-logging", "ktor-server-host-common",
+    "ktor-server-websockets"
 ]
 dockerJava = [
     "docker-java-core", "docker-java-api", "docker-java-transport-httpclient5"
@@ -102,3 +118,4 @@ k8s = ["k8s-client"]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 jib = { id = "com.google.cloud.tools.jib", version.ref = "jib" }
 gitProperties = { id = "com.gorylenko.gradle-git-properties", version.ref = "gradle-git-properties" }
+paperweight = { id = "io.papermc.paperweight.userdev", version.ref = "paper" }
