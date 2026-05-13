@@ -10,17 +10,16 @@ gradle-git-properties = "2.5.7"
 guice = "7.0.0"
 gson = "2.14.0"
 cloud = "2.0.0"
-cloudMinecraft = "2.0.0-beta.10"
+cloudMinecraft = "2.0.0-beta.15"
 cloudConfirmation = "1.0.0-rc.1"
 guava = "33.6.0-jre"
-pretty-log = "2.0"
-kotlinx-datetime = "0.8.0-0.6.x-compat"
 okio = "3.17.0"
 hazelcast = "5.6.0"
 ktor = "3.4.3"
 docker-java = "3.7.1"
 aws-sdk = "2.44.4"
 jline = "4.1.0"
+logback = "1.5.32"
 k8s-client = "7.6.1"
 paper = "1.21.4-R0.1-SNAPSHOT"
 spigot-legacy = "1.8.8-R0.1-SNAPSHOT"
@@ -50,11 +49,6 @@ cloudAnnotations = { group = "org.incendo", name = "cloud-annotations", version.
 cloudKtAnnotations = { group = "org.incendo", name = "cloud-kotlin-coroutines-annotations", version.ref = "cloud" }
 cloudKtExtensions = { group = "org.incendo", name = "cloud-kotlin-extensions", version.ref = "cloud" }
 
-# pretty log
-prettylog-common = { module = "cz.lukynka:pretty-log-common", version.ref = "pretty-log" }
-prettylog-jvm = { module = "cz.lukynka:pretty-log-jvm", version.ref = "pretty-log" }
-kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
-
 # squareup
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 
@@ -79,6 +73,7 @@ aws-s3 = { module = "software.amazon.awssdk:s3", version.ref = "aws-sdk" }
 
 jline-reader = { module = "org.jline:jline-reader", version.ref = "jline" }
 jline-builtins = { module = "org.jline:jline-builtins", version.ref = "jline" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 # fabric8 kubernetes client
 k8s-client = { module = "io.fabric8:kubernetes-client", version.ref = "k8s-client" }
@@ -99,7 +94,6 @@ velocity-api = { module = "com.velocitypowered:velocity-api", version.ref = "vel
 # Libraries can be bundled together for easier import
 [bundles]
 cloudCommands = ["cloudConfirmationProcessor", "cloudCoreApi", "cloudAnnotations", "cloudKtAnnotations", "cloudKtExtensions"]
-prettyLog = ["prettylog-common", "prettylog-jvm"]
 ktor = [
     "ktor-server-core", "ktor-server-netty",
     "ktor-server-content-negotiation", "ktor-server-auth",

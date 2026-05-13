@@ -21,14 +21,8 @@ dependencies {
     runtimeDownload(libs.guice)
     runtimeDownload(libs.gson)
 
-    // pretty log
+    // okio (used by ExtensionService for path handling)
     runtimeDownload(libs.okio) {
-        exclude(group = "org.jetbrains.kotlin")
-    }
-    runtimeDownload(libs.kotlinx.datetime) {
-        exclude(group = "org.jetbrains.kotlin")
-    }
-    runtimeDownload(libs.bundles.prettyLog) {
         exclude(group = "org.jetbrains.kotlin")
     }
 
