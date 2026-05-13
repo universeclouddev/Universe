@@ -112,16 +112,73 @@ This plan outlines the sequential development phases for the Universe Orchestrat
   - `POST /api/commands/execute` accepts `{ "command": "..." }`.
   - Returns `{ "command": "...", "output": ["..."] }`.
 
-## ⬜ Phase 6: The Minecraft Integration Plugin (External)
-**Goal:** Build the Bukkit/Paper plugin that connects the instance to the Master.
+## ✅ Phase 6: The Minecraft Integration Plugin (External)
+**Goal:** Build the Bukkit/Paper/Velocity plugins that connect game servers to the Master.
 
-* **Task 1 — Plugin Project:**
-  - Create separate plugin project under `/minecraft/modern` (target 1.21.4+) and/or `/minecraft/legacy` (target 1.8.8).
-  - Shade the Universe `api` module.
+* **Task 1 — Plugin API Module:**
+  - Created `:minecraft:api` (JVM 8, zero dependencies) with `Universe`, `UniverseAPI`, `InstanceManager`, `ConfigurationManager`, `TemplateManager`.
+  - Data classes with Java Builder patterns: `InstanceInfo`, `Configuration`, `Template`, `PortRange`, `InstanceState`.
+  - All async operations use `CompletableFuture<Optional<T>>` for Java ergonomics.
 
-* **Task 2 — State Reporting:**
-  - On `onEnable()`, hit Master's Ktor REST API to report `ONLINE`.
-  - Setup repeating task for heartbeat pings to `PUT /api/instances/{id}/state`.
+* **Task 2 — Modern Paper Plugin (`minecraft-modern`):**
+  - Targets Paper 1.21.4+, uses MiniMessage for chat formatting.
+  - Implements `UniverseAPI` with `java.net.http.HttpClient` (Java 11+).
+  - Commands: `/universe info`, `/universe players`, `/universe tps`.
+  - Heartbeat reports `players`, `maxPlayers`, `tps`.
 
-* **Task 3 — Command Interception:**
-  - Hook into the Ktor API to execute commands via `Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command)`.
+* **Task 3 — Legacy Spigot Plugin (`minecraft-legacy`):**
+  - Targets Spigot 1.8.8, uses legacy `&` color codes.
+  - Implements `UniverseAPI` with `HttpURLConnection` (Java 8 compatible).
+  - Same `/universe` command set adapted for legacy Bukkit API.
+
+* **Task 4 — Velocity Proxy Plugin (`minecraft-velocity`):**
+  - Targets Velocity 3.5.0, uses MiniMessage via same `CC.kt` pattern.
+  - Polls instances from Master REST API and auto-registers them as Velocity servers.
+  - Commands: `/universe info`, `/universe send <player> <server>`.
+
+* **Task 5 — Shared Patterns:**
+  - All plugins implement `UniverseAPI` and register via `Universe.register(this)` / `Universe.unregister()`.
+  - Retry logic with exponential backoff (3 retries, 1s/2s/3s) on all HTTP clients.
+  - `:minecraft:api` is declared as `implementation` (shaded but **not relocated**) so dependent plugins can use API classes at runtime.
+
+## ✅ Phase 7: REST API Expansion (CloudNet-Inspired)
+**Goal:** Expand the Ktor REST API with logs, streaming, cluster management, and lifecycle control.
+
+* **Task 1 — Log Endpoints:**
+  - `GET /api/instances/{id}/logs?lines=100` reads from `stdout.log`/`stderr.log`.
+  - `WS /api/instances/{id}/live-log` WebSocket streams new log lines in real-time (500ms tail polling).
+
+* **Task 2 — Node & Cluster Routes:**
+  - `GET /api/ping` — health check.
+  - `GET /api/node` — node info with version, resources, uptime, system stats.
+  - `GET /api/node/config` — node configuration.
+  - `POST /api/node/reload` — configuration reload trigger.
+  - `GET /api/cluster/nodes` — list all cluster nodes with resource usage.
+  - `GET /api/cluster/nodes/{id}` — node details with assigned instances.
+  - `POST /api/cluster/nodes/{id}/command` — remote command execution.
+
+* **Task 3 — Instance Lifecycle:**
+  - `PATCH /api/instances/{id}/lifecycle?target=start|stop|restart` — unified lifecycle control.
+  - `DELETE /api/instances/{id}` — stop and remove instance.
+  - `POST /api/instances/{id}/execute` — send command to instance stdin.
+
+* **Task 4 — Console WebSocket:**
+  - `WS /api/console` — interactive console access over WebSocket (master only).
+  - Bidirectional: client sends commands, server streams output lines.
+
+* **Task 5 — Template & Configuration Routes:**
+  - `GET /api/templates`, `GET /api/templates/{group}/{name}` — template listing.
+  - `POST /api/templates/sync` — trigger template sync with wildcard pattern.
+  - `GET /api/configurations`, `GET /api/configurations/{name}`, `PUT /api/configurations/{name}`, `DELETE /api/configurations/{name}` — full CRUD.
+
+* **Task 6 — Route Refactoring:**
+  - Split monolithic `InstanceRoutes.kt` into 6 focused route files:
+    - `CommandRoutes.kt`, `InstanceRoutes.kt`, `ConfigurationRoutes.kt`, `ClusterRoutes.kt`, `NodeRoutes.kt`, `TemplateRoutes.kt`.
+
+## ⬜ Phase 8: Future Enhancements
+* Template editing API (`POST /api/templates/{group}/{name}/files/{path}`).
+* Instance log archival to S3 or remote storage.
+* Metrics endpoint (`GET /api/metrics`) with Prometheus format.
+* Role-based API authentication (beyond bearer token passthrough).
+* Remote console command execution via Hazelcast `IExecutorService`.
+* Configuration hot-reload without restart.
