@@ -14,6 +14,7 @@ import gg.scala.universe.task.ExecuteCommandTask
 import gg.scala.universe.task.StopInstanceTask
 import gg.scala.universe.task.UniverseTask
 import gg.scala.universe.template.TemplateManager
+import gg.scala.universe.template.TemplateVariableRegistry
 import gg.scala.universe.util.json.Serializers
 import java.nio.file.Files
 import java.nio.file.Path
@@ -25,7 +26,8 @@ class TaskRouter @Inject constructor(
     private val runtimeRegistry: RuntimeRegistry,
     private val clusterStateService: ClusterStateService,
     private val portAllocator: PortAllocator,
-    private val templateManager: TemplateManager
+    private val templateManager: TemplateManager,
+    private val variableRegistry: TemplateVariableRegistry
 ) {
     fun route(task: UniverseTask) {
         when (task) {
@@ -63,6 +65,16 @@ class TaskRouter @Inject constructor(
             )
         }
 
+        // Build variable map for env var replacement
+        val variables = variableRegistry.collectVariables(configuration, task.instanceId, allocatedPort)
+        val envVars = configuration.environmentVariables.mapValues { (_, value) ->
+            var replaced = value
+            variables.forEach { (placeholder, replacement) ->
+                replaced = replaced.replace(placeholder, replacement)
+            }
+            replaced
+        }
+
         val processHandle = try {
             runtimeProvider.start(
                 instanceId = task.instanceId,
@@ -71,7 +83,8 @@ class TaskRouter @Inject constructor(
                 command = configuration.command,
                 ramMB = configuration.ramMB,
                 cpu = configuration.cpu,
-                templateConfig = configuration.templateInstallationConfig
+                templateConfig = configuration.templateInstallationConfig,
+                environmentVariables = envVars
             )
         } catch (e: Exception) {
             val cause = e.cause ?: e
