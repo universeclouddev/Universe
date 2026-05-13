@@ -2,7 +2,7 @@ dependencies {
     compileOnly(libs.velocity.api)
     annotationProcessor(libs.velocity.api)
     implementation(project(":minecraft:minecraft-api"))
-
+    implementation(kotlin("stdlib"))
     // Cloud commands
     implementation(libs.cloud.velocity)
     implementation(libs.cloudAnnotations)

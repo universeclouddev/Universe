@@ -1,6 +1,7 @@
 dependencies {
     compileOnly(libs.spigot.api)
     implementation(project(":minecraft:minecraft-api"))
+    implementation(kotlin("stdlib-jdk8"))
 
     // Cloud commands
     implementation(libs.cloud.paper)
