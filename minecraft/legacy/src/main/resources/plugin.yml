@@ -1,0 +1,17 @@
+name: Universe
+version: 1.0.0
+main: gg.scala.universe.minecraft.legacy.UniversePlugin
+author: Scala Universe
+permissions:
+  universe.command:
+    default: true
+    description: Access to the /universe command
+  universe.command.status:
+    default: true
+    description: Check Universe connection status
+  universe.command.info:
+    default: op
+    description: View detailed instance info
+  universe.command.players:
+    default: op
+    description: View online players

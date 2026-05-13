@@ -7,6 +7,14 @@ dependencyResolutionManagement {
     repositories {
         gradlePluginPortal()
         mavenCentral()
+        maven("https://repo.papermc.io/repository/maven-public/")
+    }
+}
+
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven("https://repo.papermc.io/repository/maven-public/")
     }
 }
 
@@ -21,12 +29,21 @@ registerSubProjects(
     root = "extensions",
     prefix = "extension",
     subProjects = arrayOf("api", "example", "runtime-docker", "runtime-k8s", "storage-s3")
-//    subProjects = arrayOf("api", "loader", "processor", "runtime"),
 )
 
 include(":loader")
 include(":app")
 include(":api")
+
+registerSubProjects(
+    root = "minecraft",
+    prefix = "minecraft",
+    subProjects = arrayOf("api", "modern", "legacy", "velocity")
+)
+
+//include(":minecraft:modern")
+//include(":minecraft:legacy")
+//include(":minecraft:velocity")
 //
 private fun registerSubProjects(root: String, prefix: String? = null, vararg subProjects: String) {
     val subProjectNamePrefix = if (prefix.isNullOrBlank()) "" else "$prefix-"
