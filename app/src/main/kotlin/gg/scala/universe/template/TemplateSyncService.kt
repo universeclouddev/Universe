@@ -121,6 +121,20 @@ class TemplateSyncService @Inject constructor(
     }
 
     /**
+     * Syncs all templates matching the given [pattern] to all other cluster nodes.
+     */
+    fun syncTemplates(pattern: String) {
+        val templates = resolveTemplates(pattern)
+        val otherMembers = hazelcastInstance.cluster.members.filter { it != hazelcastInstance.cluster.localMember }
+        templates.forEach { (group, name) ->
+            otherMembers.forEach { member ->
+                val nodeId = member.uuid.toString()
+                syncTemplate(group, name, nodeId)
+            }
+        }
+    }
+
+    /**
      * Resolves template directories matching the given [pattern].
      *
      * Supported patterns:

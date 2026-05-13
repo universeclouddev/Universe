@@ -8,21 +8,32 @@ import gg.scala.universe.api.plugins.configureCors
 import gg.scala.universe.api.plugins.configureExceptionCatcher
 import gg.scala.universe.api.plugins.configureLoggingMessages
 import gg.scala.universe.api.plugins.configureSecurity
+import gg.scala.universe.api.routing.configureClusterRoutes
+import gg.scala.universe.api.routing.configureCommandRoutes
+import gg.scala.universe.api.routing.configureConfigurationRoutes
 import gg.scala.universe.api.routing.configureInstanceRoutes
+import gg.scala.universe.api.routing.configureNodeRoutes
+import gg.scala.universe.api.routing.configureTemplateRoutes
 import gg.scala.universe.command.CommandProvider
-import gg.scala.universe.command.CommandSource
 import gg.scala.universe.config.UniverseMainConfiguration
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.task.TaskDispatcher
 import gg.scala.universe.service.InstanceCreationService
+import gg.scala.universe.template.TemplateManager
+import gg.scala.universe.template.TemplateSyncService
 import io.ktor.server.application.Application
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
+import io.ktor.server.websocket.WebSockets
+import io.ktor.server.websocket.pingPeriod
+import io.ktor.server.websocket.timeout
+import io.ktor.server.application.install
 import io.netty.util.internal.logging.InternalLoggerFactory
 import io.netty.util.internal.logging.JdkLoggerFactory
 import java.util.concurrent.TimeUnit
 import java.util.logging.Level
+import kotlin.time.Duration.Companion.seconds
 
 class KtorServerService @Inject constructor(
     private val configuration: UniverseMainConfiguration,
@@ -30,8 +41,9 @@ class KtorServerService @Inject constructor(
     private val hazelcastInstance: HazelcastInstance,
     private val taskDispatcher: TaskDispatcher,
     private val commandProvider: CommandProvider,
-    private val commandSource: CommandSource,
-    private val instanceCreationService: InstanceCreationService
+    private val instanceCreationService: InstanceCreationService,
+    private val templateManager: TemplateManager,
+    private val templateSyncService: TemplateSyncService
 ) {
     private var server: io.ktor.server.engine.EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -53,7 +65,16 @@ class KtorServerService @Inject constructor(
             port = configuration.apiPort,
             host = configuration.address,
             module = {
-                configureServerModule(clusterStateService, hazelcastInstance, taskDispatcher, commandProvider, commandSource, instanceCreationService)
+                configureServerModule(
+                    configuration,
+                    clusterStateService,
+                    hazelcastInstance,
+                    taskDispatcher,
+                    commandProvider,
+                    instanceCreationService,
+                    templateManager,
+                    templateSyncService
+                )
             }
         ).start(wait = false)
 
@@ -67,17 +88,32 @@ class KtorServerService @Inject constructor(
 }
 
 private fun Application.configureServerModule(
+    configuration: UniverseMainConfiguration,
     clusterStateService: ClusterStateService,
     hazelcastInstance: HazelcastInstance,
     taskDispatcher: TaskDispatcher,
     commandProvider: CommandProvider,
-    commandSource: CommandSource,
-    instanceCreationService: InstanceCreationService
+    instanceCreationService: InstanceCreationService,
+    templateManager: TemplateManager,
+    templateSyncService: TemplateSyncService
 ) {
+    install(WebSockets) {
+        pingPeriod = 15.seconds
+        timeout = 15.seconds
+        maxFrameSize = Long.MAX_VALUE
+        masking = false
+    }
+
     configureCors()
     configureSecurity()
     configureLoggingMessages()
     configureSerialization()
     configureExceptionCatcher()
-    configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, commandProvider, commandSource, instanceCreationService)
+
+    configureCommandRoutes(commandProvider)
+    configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, instanceCreationService)
+    configureConfigurationRoutes(clusterStateService)
+    configureClusterRoutes(clusterStateService, hazelcastInstance, taskDispatcher)
+    configureNodeRoutes(configuration, hazelcastInstance, commandProvider)
+    configureTemplateRoutes(clusterStateService, templateManager, templateSyncService)
 }

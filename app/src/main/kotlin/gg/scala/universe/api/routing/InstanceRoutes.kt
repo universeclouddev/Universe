@@ -1,6 +1,9 @@
 package gg.scala.universe.api.routing
 
 import com.hazelcast.core.HazelcastInstance
+import com.hazelcast.cluster.Member
+import cz.lukynka.prettylog.LogType
+import cz.lukynka.prettylog.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.nodeName
 import gg.scala.universe.hz.task.TaskDispatcher
@@ -13,39 +16,30 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
+import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
-import gg.scala.universe.command.CommandProvider
-import gg.scala.universe.command.CommandSource
+import io.ktor.server.websocket.WebSocketServerSession
+import io.ktor.server.websocket.webSocket
+import io.ktor.websocket.CloseReason
+import io.ktor.websocket.Frame
+import io.ktor.websocket.close
+import io.ktor.websocket.readText
+import kotlinx.coroutines.delay
+import java.io.RandomAccessFile
+import java.nio.file.Path
+import java.nio.file.Paths
+import kotlin.io.path.exists
 
 fun Application.configureInstanceRoutes(
     clusterStateService: ClusterStateService,
     hazelcastInstance: HazelcastInstance,
     taskDispatcher: TaskDispatcher,
-    commandProvider: CommandProvider,
-    commandSource: CommandSource,
     instanceCreationService: InstanceCreationService
 ) {
     routing {
-        route("/api/commands/execute") {
-            post {
-                val request = call.receive<ExecuteCommandRequest>()
-                val command = request.command
-                
-                val output = mutableListOf<String>()
-                val capturingSource = CapturingCommandSource(output)
-                
-                commandProvider.execute(capturingSource, command)
-                
-                call.respond(HttpStatusCode.OK, mapOf(
-                    "command" to command,
-                    "output" to output
-                ))
-            }
-        }
-
         route("/api/instances") {
             get {
                 val instances = clusterStateService.getActiveInstances()
@@ -93,6 +87,48 @@ fun Application.configureInstanceRoutes(
                 call.respond(HttpStatusCode.OK, mapOf("message" to "Instance $id stopped"))
             }
 
+            patch("/{id}/lifecycle") {
+                val id = call.parameters["id"]
+                    ?: return@patch call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing instance ID"))
+
+                val instance = clusterStateService.getInstance(id)
+                    ?: return@patch call.respond(HttpStatusCode.NotFound, mapOf("error" to "Instance not found"))
+
+                val target = call.request.queryParameters["target"]
+                    ?: return@patch call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing 'target' query parameter"))
+
+                val member = hazelcastInstance.cluster.members.firstOrNull {
+                    it.uuid.toString() == instance.wrapperNodeId
+                } ?: hazelcastInstance.cluster.localMember
+
+                when (target.lowercase()) {
+                    "start" -> {
+                        val config = clusterStateService.getConfiguration(instance.configurationName)
+                            ?: return@patch call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Configuration not found"))
+                        val newInstance = instanceCreationService.createInstance(config)
+                            ?: return@patch call.respond(HttpStatusCode.ServiceUnavailable, mapOf("error" to "No node has enough resources"))
+                        call.respond(HttpStatusCode.OK, mapOf("message" to "Instance started", "instance" to newInstance))
+                    }
+                    "stop" -> {
+                        taskDispatcher.dispatchStop(id, member)
+                        clusterStateService.updateInstanceState(id, InstanceState.STOPPED)
+                        call.respond(HttpStatusCode.OK, mapOf("message" to "Instance $id stopped"))
+                    }
+                    "restart" -> {
+                        taskDispatcher.dispatchStop(id, member)
+                        clusterStateService.updateInstanceState(id, InstanceState.STOPPED)
+                        val config = clusterStateService.getConfiguration(instance.configurationName)
+                            ?: return@patch call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Configuration not found"))
+                        val newInstance = instanceCreationService.createInstance(config)
+                            ?: return@patch call.respond(HttpStatusCode.ServiceUnavailable, mapOf("error" to "No node has enough resources"))
+                        call.respond(HttpStatusCode.OK, mapOf("message" to "Instance restarted", "instance" to newInstance))
+                    }
+                    else -> {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid lifecycle target. Supported: start, stop, restart"))
+                    }
+                }
+            }
+
             post("/{id}/execute") {
                 val id = call.parameters["id"]
                     ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing instance ID"))
@@ -131,43 +167,66 @@ fun Application.configureInstanceRoutes(
 
                 call.respond(HttpStatusCode.OK, updated)
             }
-        }
 
-        route("/api/configurations") {
-            get {
-                val configs = clusterStateService.configurations.values
-                call.respond(HttpStatusCode.OK, configs)
-            }
+            get("/{id}/logs") {
+                val id = call.parameters["id"]
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing instance ID"))
 
-            get("/{name}") {
-                val name = call.parameters["name"]
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing configuration name"))
+                val instance = clusterStateService.getInstance(id)
+                    ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "Instance not found"))
 
-                val config = clusterStateService.getConfiguration(name)
-                    ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "Configuration not found"))
+                val lines = call.request.queryParameters["lines"]?.toIntOrNull() ?: 100
+                val logFile = resolveLogFile(instance, clusterStateService)
 
-                call.respond(HttpStatusCode.OK, config)
-            }
-        }
-
-        route("/api/nodes") {
-            get {
-                val members = hazelcastInstance.cluster.members.map { member ->
-                    val nodeId = member.nodeName()
-                    val resources = clusterStateService.getNodeResources(nodeId)
-                    val maxRam = member.getAttribute("maxRamMB")?.toIntOrNull() ?: 0
-                    val maxCpu = member.getAttribute("maxCpu")?.toIntOrNull() ?: 0
-                    mapOf(
-                        "id" to nodeId,
-                        "uuid" to member.uuid.toString(),
-                        "local" to member.localMember(),
-                        "usedRamMB" to resources.usedRamMB,
-                        "maxRamMB" to maxRam,
-                        "usedCpu" to resources.usedCpu,
-                        "maxCpu" to maxCpu
-                    )
+                if (logFile == null || !logFile.exists()) {
+                    return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "No logs available for this instance"))
                 }
-                call.respond(HttpStatusCode.OK, members)
+
+                val allLines = logFile.toFile().readLines()
+                val tail = allLines.takeLast(lines.coerceAtLeast(1))
+
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "instanceId" to id,
+                    "lines" to tail,
+                    "totalLines" to allLines.size,
+                    "requestedLines" to lines
+                ))
+            }
+
+            webSocket("/{id}/live-log") {
+                val id = call.parameters["id"]
+                if (id == null) {
+                    close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Missing instance ID"))
+                    return@webSocket
+                }
+
+                val instance = clusterStateService.getInstance(id)
+                if (instance == null) {
+                    close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Instance not found"))
+                    return@webSocket
+                }
+
+                val logFile = resolveLogFile(instance, clusterStateService)
+                if (logFile == null || !logFile.exists()) {
+                    outgoing.send(Frame.Text("No logs available for this instance"))
+                    close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "No logs available"))
+                    return@webSocket
+                }
+
+                val tailer = LogTailer(logFile.toFile())
+                try {
+                    while (true) {
+                        val newLines = tailer.poll()
+                        newLines.forEach { line ->
+                            outgoing.send(Frame.Text(line))
+                        }
+                        delay(500)
+                    }
+                } catch (_: Exception) {
+                    // Client disconnected
+                } finally {
+                    tailer.close()
+                }
             }
         }
     }
@@ -175,21 +234,48 @@ fun Application.configureInstanceRoutes(
 
 data class CreateInstanceRequest(val configurationName: String)
 data class UpdateStateRequest(val state: String, val lastHeartbeat: Long? = null)
-data class ExecuteCommandRequest(val command: String)
 data class ExecuteOnInstanceRequest(val command: String)
 
-private class CapturingCommandSource(private val output: MutableList<String>) : CommandSource {
-    override fun sendMessage(message: String) {
-        output.add(message)
+private fun resolveLogFile(instance: gg.scala.universe.schema.InstanceInfo, clusterStateService: ClusterStateService): Path? {
+    val config = clusterStateService.getConfiguration(instance.configurationName)
+    val workingDir = if (config?.static == true) {
+        Paths.get("./static/${instance.configurationName}")
+    } else {
+        Paths.get("./running/${instance.id}")
+    }
+    val stdout = workingDir.resolve("stdout.log")
+    val stderr = workingDir.resolve("stderr.log")
+    return when {
+        stdout.exists() -> stdout
+        stderr.exists() -> stderr
+        else -> null
+    }
+}
+
+private class LogTailer(private val file: java.io.File) {
+    private val raf = RandomAccessFile(file, "r")
+    private var lastPosition = file.length()
+    init { raf.seek(lastPosition) }
+
+    fun poll(): List<String> {
+        val newLines = mutableListOf<String>()
+        val currentLength = file.length()
+        if (currentLength < lastPosition) {
+            // File was truncated, reset to beginning
+            raf.seek(0)
+            lastPosition = 0
+        }
+        if (currentLength > lastPosition) {
+            val bytes = ByteArray((currentLength - lastPosition).toInt())
+            raf.readFully(bytes)
+            val text = String(bytes, Charsets.UTF_8)
+            text.lines().filter { it.isNotEmpty() }.forEach { newLines.add(it) }
+            lastPosition = currentLength
+        }
+        return newLines
     }
 
-    override fun sendMessage(vararg messages: String) {
-        messages.forEach { output.add(it) }
+    fun close() {
+        try { raf.close() } catch (_: Exception) {}
     }
-
-    override fun sendMessage(messages: MutableCollection<String>) {
-        output.addAll(messages)
-    }
-
-    override fun checkPermission(permission: String): Boolean = true
 }

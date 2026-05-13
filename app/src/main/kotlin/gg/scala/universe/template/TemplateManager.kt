@@ -249,4 +249,40 @@ class TemplateManager @Inject constructor(
     ): Map<String, String> {
         return variableRegistry.collectVariables(configuration, instanceId, allocatedPort)
     }
+
+    /**
+     * Lists all local templates under `./templates/`.
+     *
+     * @return A list of [Template] objects discovered from the filesystem.
+     */
+    fun listAllTemplates(): List<Template> {
+        val results = mutableListOf<Template>()
+        if (!templatesDir.exists() || !templatesDir.isDirectory()) {
+            return results
+        }
+        Files.list(templatesDir).use { groupStream ->
+            groupStream.filter { it.isDirectory() }.forEach { groupDir ->
+                Files.list(groupDir).use { templateStream ->
+                    templateStream.filter { it.isDirectory() }.forEach { templateDir ->
+                        results.add(
+                            Template(
+                                name = templateDir.name,
+                                group = groupDir.name,
+                                storage = "local",
+                                priority = 0
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        return results
+    }
+
+    /**
+     * Returns the filesystem path for a template.
+     */
+    fun getTemplatePath(group: String, name: String): Path {
+        return templatesDir.resolve(group).resolve(name)
+    }
 }
