@@ -2,8 +2,8 @@ package gg.scala.universe.api.routing
 
 import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.cluster.Member
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.nodeName
 import gg.scala.universe.hz.task.TaskDispatcher

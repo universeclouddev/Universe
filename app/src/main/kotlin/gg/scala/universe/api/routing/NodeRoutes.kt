@@ -1,8 +1,8 @@
 package gg.scala.universe.api.routing
 
 import com.hazelcast.core.HazelcastInstance
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.command.CommandProvider
 import gg.scala.universe.command.CommandSource
 import gg.scala.universe.config.UniverseMainConfiguration
