@@ -65,7 +65,7 @@ Artifacts are copied to `.built/` after build.
 | `extensions/storage-s3` | AWS S3 template storage backend |
 | `extensions/example` | Reference extension implementation |
 | `minecraft/minecraft-api` | JVM 8 compatible public API for Minecraft plugin developers |
-| `minecraft/minecraft-modern` | Paper 1.21.4+ plugin with MiniMessage support |
+| `minecraft/minecraft-modern` | Paper 1.21.11+ plugin with MiniMessage support |
 | `minecraft/minecraft-legacy` | Spigot 1.8.8 plugin with legacy color codes |
 | `minecraft/minecraft-velocity` | Velocity 3.5.0 proxy plugin |
 
@@ -248,6 +248,21 @@ All commands work both in the console and via `POST /api/commands/execute`.
 | `GET` | `/api/templates/{group}/{name}` | Get template info |
 | `POST` | `/api/templates/sync` | Sync templates matching pattern to all nodes |
 
+## Logging
+
+Universe uses two complementary logging systems:
+
+| System | Purpose | Output |
+|--------|---------|--------|
+| **Console** (`gg.scala.universe.console`) | User-facing CLI output with styled arrows, badges, and tables | stdout (via JLine) |
+| **SLF4J/Logback** | Framework internals (Hazelcast, Docker, K8s, Netty) | `./logs/universe.log` |
+
+The `debug` flag in `./config.json` controls both:
+- **Normal (`debug: false`)**: Console shows `INFO`+ operational messages; Logback console shows `WARN`+ only; full logs go to file
+- **Debug (`debug: true`)**: Console shows `INFO`+ and `DEBUG` messages; Logback shows `INFO`+ for all loggers including frameworks
+
+Log files are rotated daily and retained for **30 days**.
+
 ## Templates
 
 Templates live in `./templates/<group>/<name>/`.
@@ -268,7 +283,15 @@ When an instance is created, `TemplateManager`:
 1. Resolves templates from `TemplateInstallationConfig`
 2. Copies them to `./running/<instance-id>/` in priority order
 3. Scans files listed in `Configuration.fileModifications`
-4. Replaces variables: `%PORT%`, `%INSTANCE_ID%`, `%MASTER_IP%`, etc.
+4. Replaces built-in variables:
+   - `%PORT%` — allocated instance port
+   - `%INSTANCE_ID%` — 6-character instance ID
+   - `%MASTER_IP%` / `%MASTER_ADDRESS%` — master node address
+   - `%MASTER_PORT%` — master Hazelcast port
+   - `%MASTER_API_PORT%` — master REST API port
+   - `%NODE_ID%` — local node ID
+   - `%HOST_ADDRESS%` — local host address
+   - `%CONFIGURATION_NAME%` — configuration name
 
 **Template sync between nodes:**
 ```bash
@@ -329,7 +352,7 @@ api.instanceManager.getInstances().thenAccept { instances ->
 
 ### Modern Paper Plugin (`minecraft-modern`)
 
-- Targets Paper 1.21.4+
+- Targets Paper 1.21.11+
 - Uses **MiniMessage** for all chat formatting (`CC.kt` converts `&` codes internally)
 - Commands: `/universe info`, `/universe players`, `/universe tps`
 - Reports TPS, player count, and max players in heartbeat
@@ -346,6 +369,30 @@ api.instanceManager.getInstances().thenAccept { instances ->
 - Uses MiniMessage via same `CC.kt` pattern as modern
 - Polls instances from Master REST API and auto-registers them as Velocity servers
 - Commands: `/universe info`, `/universe send <player> <server>`
+
+### Plugin Master URL Configuration
+
+The plugin resolves the Master REST API URL from (in priority order):
+
+1. `universe.master.url` JVM system property
+2. `UNIVERSE_MASTER_URL` environment variable
+3. `master-url` in `plugins/Universe/config.yml`
+4. Default `http://localhost:6000`
+
+**Docker / Kubernetes networking:**
+
+If the Minecraft server runs in a container or pod and the Master is on a different network, set the env var to a reachable address:
+
+```bash
+# Docker Compose → containerized server
+-e UNIVERSE_MASTER_URL=http://host.docker.internal:6000
+
+# Kubernetes pod → external Master
+-e UNIVERSE_MASTER_URL=http://my-game-host.example.com:6000
+
+# Kubernetes pod → in-cluster Master Service
+-e UNIVERSE_MASTER_URL=http://universe-master-service:6000
+```
 
 ### Building Minecraft Plugins
 

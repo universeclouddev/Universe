@@ -30,6 +30,8 @@ This extension allows Universe to spawn instances as **Kubernetes Pods** instead
 }
 ```
 
+**Note on networking:** The K8s extension exposes the allocated port via `hostPort` on the Pod spec, making the Minecraft server reachable from outside the cluster on the node's IP address. Ensure your firewall/security groups allow traffic to the allocated port range.
+
 For cloud mode, see [CLOUD.md](CLOUD.md) for one-command deployment with S3 templates.
 
 ## End-User Experience (Cloud + S3)

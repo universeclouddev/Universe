@@ -27,10 +27,17 @@
             <option value="$PROJECT_DIR$/extensions/api" />
             <option value="$PROJECT_DIR$/extensions/example" />
             <option value="$PROJECT_DIR$/extensions/runtime-docker" />
+            <option value="$PROJECT_DIR$/extensions/runtime-k8s" />
             <option value="$PROJECT_DIR$/extensions/storage-s3" />
             <option value="$PROJECT_DIR$/loader" />
+            <option value="$PROJECT_DIR$/minecraft" />
+            <option value="$PROJECT_DIR$/minecraft/api" />
+            <option value="$PROJECT_DIR$/minecraft/legacy" />
+            <option value="$PROJECT_DIR$/minecraft/modern" />
+            <option value="$PROJECT_DIR$/minecraft/velocity" />
           </set>
         </option>
+        <option name="resolveExternalAnnotations" value="true" />
       </GradleProjectSettings>
     </option>
     <option name="parallelModelFetch" value="true" />

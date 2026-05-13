@@ -28,7 +28,7 @@ This document defines the roles, system boundaries, and handoff protocols for th
   - **Docker Extension:** Creating `extensions/runtime-docker` and registering `DockerRuntimeProvider` under the `"docker"` key.
   - **K8s Extension:** Creating `extensions/runtime-k8s` and registering `K8sRuntimeProvider` under the `"k8s"` key.
   - **S3 Storage Extension:** Creating `extensions/storage-s3` implementing `TemplateStorageProvider` for remote template storage via AWS SDK v2.
-  - **Minecraft Plugin:** Building three platform plugins (Modern Paper 1.21.4+, Legacy Spigot 1.8.8, Velocity 3.5.0) that shade the `:minecraft:api` module (JVM 8, zero deps), connect to the Master's Ktor REST API, report server health, and intercept console commands.
+  - **Minecraft Plugin:** Building three platform plugins (Modern Paper 1.21.11+, Legacy Spigot 1.8.8, Velocity 3.5.0) that shade the `:minecraft:api` module (JVM 8, zero deps), connect to the Master's Ktor REST API, report server health, and intercept console commands.
 
 ## 4. The Reviewer (Quality & Architecture Control)
 * **Responsibility:** Code review, dependency management, and boundary enforcement.
@@ -61,6 +61,7 @@ This document defines the roles, system boundaries, and handoff protocols for th
 - **Ktor 3.4.3 (Netty engine)** is added as a `runtimeDownload` bundle in `libs.versions.toml` under `[bundles] ktor`. The `app` module consumes it via `runtimeDownload(libs.bundles.ktor)`.
 - **Hazelcast Task Dispatch:** Tasks sent over `IExecutorService` are serialized as **Gson-serialized JSON strings** (plain `String` payloads), not Hazelcast-native serialization.
 - **JVM Target:** Kotlin `jvmTarget` is set to `JvmTarget.JVM_25`. JDK 25 is released and GA (September 2025).
+- **Logging:** The project uses a custom `Console` system (in `:api` module) for all user-facing CLI output. Framework internals (Hazelcast, Docker, K8s) use SLF4J/Logback. The `debug` flag in `config.json` controls both Console debug output and Logback levels.
 
 ## RuntimeProvider & RuntimeRegistry
 - `RuntimeProvider` is defined in the `api` module. It is the abstraction for starting, stopping, and piping commands to an instance runtime.
@@ -80,11 +81,12 @@ This document defines the roles, system boundaries, and handoff protocols for th
 - `CommandBootstrap` starts a daemon thread reading from `System.in` and dispatches to `CommandProvider.execute()`.
 - `ManagementCommands` provides cluster, instance, config, template, extension, and system commands.
 - The Ktor REST API exposes `POST /api/commands/execute` accepting `{ "command": "..." }` and returning captured output.
-- `ConsoleCommandSource` implements `CommandSource` using PrettyLog for console output.
+- `ConsoleCommandSource` implements `CommandSource` using the `Console` system for styled output.
 
 ## Template System Architecture
 - `TemplateManager` resolves templates from `./templates/<group>/<name>/`, copies them to `./running/<instance-id>/`, and applies variable replacements.
 - `TemplateVariableProvider` allows extensions to contribute custom variables (e.g., `%PORT%`, `%INSTANCE_ID%`).
+- `DefaultTemplateVariableProvider` is bound as an eager singleton in `MainGuiceModule` and provides built-in variables: `%PORT%`, `%INSTANCE_ID%`, `%MASTER_IP%`, `%MASTER_ADDRESS%`, `%MASTER_PORT%`, `%MASTER_API_PORT%`, `%NODE_ID%`, `%HOST_ADDRESS%`, `%CONFIGURATION_NAME%`.
 - `TemplateSyncService` zips templates and dispatches them to other cluster nodes via Hazelcast `IExecutorService`.
 - `TemplateResolver` interface (in `extensions/api`) exposes `resolveTemplates(pattern: String)` for wildcard resolution.
 - `TemplateStorageProvider` abstraction allows remote backends (e.g., S3) to store and retrieve template zips.
@@ -103,11 +105,12 @@ This document defines the roles, system boundaries, and handoff protocols for th
 
 ## Reference Libraries & Inspirations
 
-### PrettyLog
-- **Repository:** https://github.com/LukynkaCZE/PrettyLog
-- **Description:** Kotlin logging library focused on readability in console using ANSI color codes.
-- **Usage in Universe:** All logging throughout the project uses `cz.lukynka.prettylog.log()` with `LogType` enum values (e.g., `LogType.INFORMATION`, `LogType.WARNING`, `LogType.NETWORK`, `LogType.ERROR`).
-- **Key API:** `log(message, type)`, `PrettyLogSettings.saveToFile`, custom `LogType` instances with `LogStyle` and prefixes.
+### Console (Custom ANSI Logging)
+- **Location:** `:api` module — `gg.scala.universe.console.Console` object and `log()` compatibility shim
+- **Description:** Custom ANSI-styled console output system replacing PrettyLog. Provides tree-arrow prefixes (`→`, `✓`, `⚠`, `✗`), status badges, table formatting, and debug-gated output.
+- **Usage in Universe:** All user-facing CLI logging uses `gg.scala.universe.console.log()` with `LogLevel` enum values (`INFO`, `SUCCESS`, `WARNING`, `ERROR`, `DEBUG`, `NETWORK`). Framework internals (Hazelcast, Docker, K8s) use SLF4J/Logback.
+- **Key API:** `Console.info()`, `Console.success()`, `Console.warn()`, `Console.error()`, `Console.debug()`, `Console.network()`, `Console.badge()`, `Console.row()`, `Console.headerRow()`, `Console.kv()`, `Console.label()`.
+- **Debug Mode:** `Console.setDebug(enabled)` gates `Console.debug()` output. The same flag controls Logback root/app logger levels via `configureLogbackLevels()`.
 
 ### Cloud Command Framework (Incendo)
 - **Repository:** https://github.com/Incendo/cloud
