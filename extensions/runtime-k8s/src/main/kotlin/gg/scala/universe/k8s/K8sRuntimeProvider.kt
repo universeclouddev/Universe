@@ -64,7 +64,8 @@ class K8sRuntimeProvider(
         command: String,
         ramMB: Int,
         cpu: Int,
-        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?
+        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?,
+        environmentVariables: Map<String, String>?
     ): ProcessHandle {
         val k8s = requireClient()
         val podName = "universe-$instanceId"
@@ -160,8 +161,13 @@ class K8sRuntimeProvider(
         }
 
         // Environment variables
-        if (config.env.isNotEmpty()) {
-            containerBuilder.withEnv(config.env.map { (k, v) ->
+        val allEnv = mutableMapOf<String, String>()
+        allEnv.putAll(config.env)
+        if (!environmentVariables.isNullOrEmpty()) {
+            allEnv.putAll(environmentVariables)
+        }
+        if (allEnv.isNotEmpty()) {
+            containerBuilder.withEnv(allEnv.map { (k, v) ->
                 EnvVarBuilder().withName(k).withValue(v).build()
             })
         }

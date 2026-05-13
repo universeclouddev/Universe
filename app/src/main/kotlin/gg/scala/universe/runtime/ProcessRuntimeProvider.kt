@@ -25,7 +25,8 @@ class ProcessRuntimeProvider : RuntimeProvider {
         command: String,
         ramMB: Int,
         cpu: Int,
-        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?
+        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?,
+        environmentVariables: Map<String, String>?
     ): ProcessHandle {
         if (command.isBlank()) {
             throw IllegalArgumentException("Command is blank for instance $instanceId")
@@ -37,12 +38,17 @@ class ProcessRuntimeProvider : RuntimeProvider {
         // Build command with resource limit fallback prefix
         val wrappedCommand = CgroupResourceEnforcer.buildFallbackPrefix(ramMB, cpu) + command
 
-        val process = ProcessBuilder("bash", "-c", wrappedCommand)
+        val processBuilder = ProcessBuilder("bash", "-c", wrappedCommand)
             .directory(workingDir.toFile())
             .redirectOutput(ProcessBuilder.Redirect.to(logOut))
             .redirectError(ProcessBuilder.Redirect.to(logErr))
             .redirectInput(ProcessBuilder.Redirect.PIPE)
-            .start()
+
+        if (!environmentVariables.isNullOrEmpty()) {
+            processBuilder.environment().putAll(environmentVariables)
+        }
+
+        val process = processBuilder.start()
 
         processes[instanceId] = process
 

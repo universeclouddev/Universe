@@ -41,7 +41,8 @@ class DockerRuntimeProvider(
         command: String,
         ramMB: Int,
         cpu: Int,
-        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?
+        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?,
+        environmentVariables: Map<String, String>?
     ): ProcessHandle {
         val containerName = "universe-$instanceId"
 
@@ -125,6 +126,10 @@ class DockerRuntimeProvider(
             .withCmd("sh", "-c", command)
             .withExposedPorts(*exposedPorts.toTypedArray())
             .withHostConfig(hostConfig)
+
+        if (!environmentVariables.isNullOrEmpty()) {
+            createCmd.withEnv(environmentVariables.map { (k, v) -> "$k=$v" })
+        }
 
         if (config.user != null) {
             createCmd.withUser(config.user)

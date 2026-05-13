@@ -24,7 +24,8 @@ class ScreenRuntimeProvider : RuntimeProvider {
         command: String,
         ramMB: Int,
         cpu: Int,
-        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?
+        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?,
+        environmentVariables: Map<String, String>?
     ): ProcessHandle {
         val sessionName = sessionName(instanceId)
 
@@ -34,9 +35,14 @@ class ScreenRuntimeProvider : RuntimeProvider {
         // Build command with resource limit fallback prefix
         val prefix = CgroupResourceEnforcer.buildFallbackPrefix(ramMB, cpu)
         val shellCommand = "cd ${workingDir.toAbsolutePath()} && $prefix$command"
-        val process = ProcessBuilder("screen", "-dmS", sessionName, "bash", "-c", shellCommand)
+        val processBuilder = ProcessBuilder("screen", "-dmS", sessionName, "bash", "-c", shellCommand)
             .inheritIO()
-            .start()
+
+        if (!environmentVariables.isNullOrEmpty()) {
+            processBuilder.environment().putAll(environmentVariables)
+        }
+
+        val process = processBuilder.start()
 
         val handle = process.toHandle()
         sessions[instanceId] = handle

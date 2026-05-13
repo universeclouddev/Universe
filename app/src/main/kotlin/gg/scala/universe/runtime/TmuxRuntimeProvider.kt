@@ -24,7 +24,8 @@ class TmuxRuntimeProvider : RuntimeProvider {
         command: String,
         ramMB: Int,
         cpu: Int,
-        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?
+        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?,
+        environmentVariables: Map<String, String>?
     ): ProcessHandle {
         val sessionName = sessionName(instanceId)
 
@@ -34,9 +35,14 @@ class TmuxRuntimeProvider : RuntimeProvider {
         // Build command with resource limit fallback prefix
         val wrappedCommand = CgroupResourceEnforcer.buildFallbackPrefix(ramMB, cpu) + command
 
-        val process = ProcessBuilder("tmux", "new-session", "-d", "-s", sessionName, "-c", workingDir.toAbsolutePath().toString(), wrappedCommand)
+        val processBuilder = ProcessBuilder("tmux", "new-session", "-d", "-s", sessionName, "-c", workingDir.toAbsolutePath().toString(), wrappedCommand)
             .inheritIO()
-            .start()
+
+        if (!environmentVariables.isNullOrEmpty()) {
+            processBuilder.environment().putAll(environmentVariables)
+        }
+
+        val process = processBuilder.start()
 
         val handle = process.toHandle()
         sessions[instanceId] = handle
