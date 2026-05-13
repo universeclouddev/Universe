@@ -1,7 +1,7 @@
 package gg.scala.universe.docker
 
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.util.json.Serializers
 import java.nio.file.Files
 import java.nio.file.Path
@@ -22,8 +22,8 @@ object DockerConfigLoader {
                 Serializers.GSON.fromJson(reader, DockerConfig::class.java)
             }
         } catch (e: Exception) {
-            log("Failed to load docker config from $CONFIG_FILE: ${e.message}", LogType.ERROR)
-            log("Defaulting to base docker config", LogType.ERROR)
+            log("Failed to load docker config from $CONFIG_FILE: ${e.message}", LogLevel.ERROR)
+            log("Defaulting to base docker config", LogLevel.ERROR)
             DockerConfig()
         }
     }
@@ -35,7 +35,7 @@ object DockerConfigLoader {
                 Serializers.GSON.toJson(config, writer)
             }
         } catch (e: Exception) {
-            log("Failed to save docker config to $CONFIG_FILE: ${e.message}", LogType.ERROR)
+            log("Failed to save docker config to $CONFIG_FILE: ${e.message}", LogLevel.ERROR)
         }
     }
 }

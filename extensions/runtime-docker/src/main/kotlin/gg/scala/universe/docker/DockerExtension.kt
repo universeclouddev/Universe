@@ -1,8 +1,8 @@
 package gg.scala.universe.docker
 
 import com.google.inject.Inject
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.extension.Extension
 import gg.scala.universe.runtime.RuntimeRegistry
 
@@ -20,17 +20,17 @@ class DockerExtension : Extension {
         config = DockerConfigLoader.load()
         val provider = DockerRuntimeProvider(config)
         runtimeRegistry.register(config.factoryName, provider)
-        log("Docker runtime extension loaded (image=${config.javaImage.repository}:${config.javaImage.tag})", LogType.SUCCESS)
+        log("Docker runtime extension loaded (image=${config.javaImage.repository}:${config.javaImage.tag})", LogLevel.SUCCESS)
     }
 
     override fun onUnload() {
         runtimeRegistry.unregister(config.factoryName)
-        log("Docker runtime extension unloaded", LogType.INFORMATION)
+        log("Docker runtime extension unloaded")
     }
 
     override fun onReload() {
         onUnload()
         onLoad()
-        log("Docker runtime extension reloaded", LogType.INFORMATION)
+        log("Docker runtime extension reloaded")
     }
 }

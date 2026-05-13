@@ -3,8 +3,8 @@ package gg.scala.universe.template
 import com.google.inject.Inject
 import com.google.inject.Singleton
 import com.hazelcast.core.HazelcastInstance
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.task.UniverseCallableTask
 import gg.scala.universe.task.TemplateSyncTask
@@ -48,7 +48,7 @@ class TemplateSyncService @Inject constructor(
     fun syncTemplate(group: String, name: String, targetNodeId: String): Boolean {
         val sourceDir = templatesDir.resolve(group).resolve(name)
         if (!sourceDir.exists() || !sourceDir.isDirectory()) {
-            log("Template directory not found: $sourceDir", LogType.WARNING)
+            log("Template directory not found: $sourceDir", LogLevel.WARNING)
             return false
         }
 
@@ -57,7 +57,7 @@ class TemplateSyncService @Inject constructor(
         }
 
         if (targetMember == null) {
-            log("Target node $targetNodeId not found in cluster", LogType.WARNING)
+            log("Target node $targetNodeId not found in cluster", LogLevel.WARNING)
             return false
         }
 
@@ -75,13 +75,13 @@ class TemplateSyncService @Inject constructor(
             )
             log(
                 "Dispatched template sync for $group/$name to node $targetNodeId",
-                LogType.INFORMATION
+                LogLevel.INFO
             )
             true
         } catch (e: Exception) {
             log(
                 "Failed to sync template $group/$name to node $targetNodeId: ${e.message}",
-                LogType.ERROR
+                LogLevel.ERROR
             )
             false
         }
@@ -98,7 +98,7 @@ class TemplateSyncService @Inject constructor(
         if (bytes == null) {
             log(
                 "Received template sync task with null bytes for ${task.group}/${task.name}",
-                LogType.WARNING
+                LogLevel.WARNING
             )
             return false
         }
@@ -108,13 +108,13 @@ class TemplateSyncService @Inject constructor(
             unzipDirectory(bytes, targetDir)
             log(
                 "Received and extracted template ${task.group}/${task.name}",
-                LogType.SUCCESS
+                LogLevel.SUCCESS
             )
             true
         } catch (e: Exception) {
             log(
                 "Failed to extract template ${task.group}/${task.name}: ${e.message}",
-                LogType.ERROR
+                LogLevel.ERROR
             )
             false
         }
@@ -226,7 +226,7 @@ class TemplateSyncService @Inject constructor(
                     if (!entryPath.startsWith(target)) {
                         log(
                             "Skipping zip entry with path traversal: ${entry.name}",
-                            LogType.WARNING
+                            LogLevel.WARNING
                         )
                         entry = zis.nextEntry
                         continue

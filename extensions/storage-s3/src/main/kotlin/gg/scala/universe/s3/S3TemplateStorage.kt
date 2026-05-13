@@ -2,8 +2,8 @@ package gg.scala.universe.s3
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.template.TemplateStorageProvider
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
@@ -53,7 +53,7 @@ class S3TemplateStorage @Inject constructor() : TemplateStorageProvider {
         val targetDir = templatesDir.resolve(group).resolve(name)
 
         return try {
-            log("Downloading template $group/$name from S3 (key=$key)", LogType.INFORMATION)
+            log("Downloading template $group/$name from S3 (key=$key)")
 
             val responseBytes = client.getObjectAsBytes(
                 GetObjectRequest.builder()
@@ -64,10 +64,10 @@ class S3TemplateStorage @Inject constructor() : TemplateStorageProvider {
 
             unzipDirectory(responseBytes.asByteArray(), targetDir)
 
-            log("Downloaded and extracted template $group/$name from S3", LogType.SUCCESS)
+            log("Downloaded and extracted template $group/$name from S3", LogLevel.SUCCESS)
             true
         } catch (e: Exception) {
-            log("Failed to download template $group/$name from S3: ${e.message}", LogType.ERROR)
+            log("Failed to download template $group/$name from S3: ${e.message}", LogLevel.ERROR)
             false
         }
     }
@@ -81,14 +81,14 @@ class S3TemplateStorage @Inject constructor() : TemplateStorageProvider {
     override fun uploadTemplate(group: String, name: String): Boolean {
         val sourceDir = templatesDir.resolve(group).resolve(name)
         if (!sourceDir.exists() || !sourceDir.isDirectory()) {
-            log("Template directory not found: $sourceDir", LogType.WARNING)
+            log("Template directory not found: $sourceDir", LogLevel.WARNING)
             return false
         }
 
         val key = "${config.prefix}${group}/${name}.zip"
 
         return try {
-            log("Uploading template $group/$name to S3 (key=$key)", LogType.INFORMATION)
+            log("Uploading template $group/$name to S3 (key=$key)")
 
             val zipBytes = zipDirectory(sourceDir)
 
@@ -101,10 +101,10 @@ class S3TemplateStorage @Inject constructor() : TemplateStorageProvider {
                 RequestBody.fromBytes(zipBytes)
             )
 
-            log("Uploaded template $group/$name to S3", LogType.SUCCESS)
+            log("Uploaded template $group/$name to S3", LogLevel.SUCCESS)
             true
         } catch (e: Exception) {
-            log("Failed to upload template $group/$name to S3: ${e.message}", LogType.ERROR)
+            log("Failed to upload template $group/$name to S3: ${e.message}", LogLevel.ERROR)
             false
         }
     }
@@ -138,7 +138,7 @@ class S3TemplateStorage @Inject constructor() : TemplateStorageProvider {
                 }
             }
         } catch (e: Exception) {
-            log("Failed to list templates in group $group from S3: ${e.message}", LogType.ERROR)
+            log("Failed to list templates in group $group from S3: ${e.message}", LogLevel.ERROR)
         }
 
         return templates
@@ -151,7 +151,7 @@ class S3TemplateStorage @Inject constructor() : TemplateStorageProvider {
         try {
             client.close()
         } catch (e: Exception) {
-            log("Failed to close S3 client: ${e.message}", LogType.ERROR)
+            log("Failed to close S3 client: ${e.message}", LogLevel.ERROR)
         }
     }
 
@@ -204,7 +204,7 @@ class S3TemplateStorage @Inject constructor() : TemplateStorageProvider {
                 while (entry != null) {
                     val entryPath = target.resolve(entry.name).normalize()
                     if (!entryPath.startsWith(target)) {
-                        log("Skipping zip entry with path traversal: ${entry.name}", LogType.WARNING)
+                        log("Skipping zip entry with path traversal: ${entry.name}", LogLevel.WARNING)
                         entry = zis.nextEntry
                         continue
                     }

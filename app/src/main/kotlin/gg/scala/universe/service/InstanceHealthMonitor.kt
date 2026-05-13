@@ -3,8 +3,8 @@ package gg.scala.universe.service
 import com.google.inject.Inject
 import com.google.inject.Singleton
 import com.hazelcast.core.HazelcastInstance
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.runtime.PortAllocator
 import gg.scala.universe.runtime.RuntimeRegistry
@@ -42,11 +42,18 @@ class InstanceHealthMonitor @Inject constructor(
             5,   // period
             TimeUnit.SECONDS
         )
-        log("InstanceHealthMonitor started (interval=5s)", LogType.INFORMATION)
+        log("InstanceHealthMonitor started (interval=5s)", LogLevel.INFO)
     }
 
     fun stop() {
-        executor.shutdownNow()
+        executor.shutdown()
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow()
+            }
+        } catch (_: InterruptedException) {
+            executor.shutdownNow()
+        }
     }
 
     private fun checkHealth() {
@@ -65,18 +72,18 @@ class InstanceHealthMonitor @Inject constructor(
                 val runtimeProvider = runtimeRegistry.get(runtimeKey)
 
                 if (runtimeProvider == null) {
-                    log("No runtime provider '$runtimeKey' for instance ${instance.id}, marking OFFLINE", LogType.WARNING)
+                    log("No runtime provider '$runtimeKey' for instance ${instance.id}, marking OFFLINE", LogLevel.WARNING)
                     markOffline(instance, config)
                     continue
                 }
 
                 if (!runtimeProvider.isRunning(instance.id)) {
-                    log("Instance ${instance.id} is no longer running (runtime=$runtimeKey), marking OFFLINE", LogType.WARNING)
+                    log("Instance ${instance.id} is no longer running (runtime=$runtimeKey), marking OFFLINE", LogLevel.WARNING)
                     markOffline(instance, config)
                 }
             }
         } catch (e: Exception) {
-            log("InstanceHealthMonitor encountered an error: ${e.message}", LogType.ERROR)
+            log("InstanceHealthMonitor encountered an error: ${e.message}", LogLevel.ERROR)
         }
     }
 
@@ -95,10 +102,10 @@ class InstanceHealthMonitor @Inject constructor(
                     Files.walk(workingDir)
                         .sorted(Comparator.reverseOrder())
                         .forEach { Files.deleteIfExists(it) }
-                    log("Cleaned up working directory for dead instance ${instance.id}", LogType.INFORMATION)
+                    log("Cleaned up working directory for dead instance ${instance.id}", LogLevel.INFO)
                 }
             } catch (cleanupEx: Exception) {
-                log("Failed to clean up working directory for dead instance ${instance.id}: ${cleanupEx.message}", LogType.WARNING)
+                log("Failed to clean up working directory for dead instance ${instance.id}: ${cleanupEx.message}", LogLevel.WARNING)
             }
         }
 
@@ -108,6 +115,6 @@ class InstanceHealthMonitor @Inject constructor(
             lastHeartbeat = System.currentTimeMillis()
         )
         clusterStateService.putInstance(updated)
-        log("Instance ${instance.id} marked OFFLINE and resources released", LogType.INFORMATION)
+        log("Instance ${instance.id} marked OFFLINE and resources released", LogLevel.INFO)
     }
 }

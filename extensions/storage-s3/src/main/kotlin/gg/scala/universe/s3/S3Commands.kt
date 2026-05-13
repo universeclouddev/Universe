@@ -1,8 +1,8 @@
 package gg.scala.universe.s3
 
 import com.google.inject.Inject
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.command.CommandSource
 import gg.scala.universe.template.TemplateResolver
 import org.incendo.cloud.annotations.Argument

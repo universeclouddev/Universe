@@ -2,8 +2,8 @@ package gg.scala.universe.service
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.config.UniverseMainConfiguration
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.schema.InstanceState
@@ -29,7 +29,7 @@ class InstanceCountEnforcer @Inject constructor(
 
     fun start() {
         if (!configuration.isMasterNode) {
-            log("InstanceCountEnforcer disabled on non-master node", LogType.INFORMATION)
+            log("InstanceCountEnforcer disabled on non-master node", LogLevel.INFO)
             return
         }
 
@@ -39,11 +39,18 @@ class InstanceCountEnforcer @Inject constructor(
             5,   // period
             TimeUnit.SECONDS
         )
-        log("InstanceCountEnforcer started (interval=5s)", LogType.INFORMATION)
+        log("InstanceCountEnforcer started (interval=5s)", LogLevel.INFO)
     }
 
     fun stop() {
-        executor.shutdownNow()
+        executor.shutdown()
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow()
+            }
+        } catch (_: InterruptedException) {
+            executor.shutdownNow()
+        }
     }
 
     private fun enforce() {
@@ -66,7 +73,7 @@ class InstanceCountEnforcer @Inject constructor(
                 log(
                     "Config '${config.name}' has $activeCount active instance(s), " +
                     "minimum=${config.minimumServiceCount}. Spawning $deficit...",
-                    LogType.WARNING
+                    LogLevel.WARNING
                 )
 
                 repeat(deficit) { i ->
@@ -74,18 +81,18 @@ class InstanceCountEnforcer @Inject constructor(
                     if (instanceInfo == null) {
                         log(
                             "Failed to spawn instance #$i for config '${config.name}': no node has enough resources.",
-                            LogType.WARNING
+                            LogLevel.WARNING
                         )
                         return@repeat
                     }
                     log(
                         "Auto-spawned instance ${instanceInfo.id} for config '${config.name}' on node ${instanceInfo.wrapperNodeId}",
-                        LogType.SUCCESS
+                        LogLevel.SUCCESS
                     )
                 }
             }
         } catch (e: Exception) {
-            log("InstanceCountEnforcer encountered an error: ${e.message}", LogType.ERROR)
+            log("InstanceCountEnforcer encountered an error: ${e.message}", LogLevel.ERROR)
         }
     }
 }

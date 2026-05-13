@@ -11,6 +11,7 @@ import gg.scala.universe.config.UniverseMainConfiguration
 import gg.scala.universe.extension.ExtensionService
 import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.runtime.RuntimeRegistryImpl
+import gg.scala.universe.template.DefaultTemplateVariableProvider
 import gg.scala.universe.template.TemplateStorageRegistry
 import gg.scala.universe.template.TemplateStorageRegistryImpl
 import gg.scala.universe.template.TemplateVariableRegistry
@@ -26,6 +27,7 @@ class MainGuiceModule : AbstractModule() {
         bind(object : TypeLiteral<CommandManager<CommandSource>>() {}).to(DefaultCommandManager::class.java).asEagerSingleton()
         bind(TemplateStorageRegistry::class.java).to(TemplateStorageRegistryImpl::class.java).asEagerSingleton()
         bind(TemplateVariableRegistry::class.java).to(TemplateVariableRegistryImpl::class.java).asEagerSingleton()
+        bind(DefaultTemplateVariableProvider::class.java).asEagerSingleton()
         bind(ExecutorService::class.java).toInstance(Executors.newFixedThreadPool(4))
     }
 

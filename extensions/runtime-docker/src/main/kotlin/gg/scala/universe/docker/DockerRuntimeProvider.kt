@@ -10,8 +10,8 @@ import com.github.dockerjava.api.model.Volume
 import com.github.dockerjava.core.DefaultDockerClientConfig
 import com.github.dockerjava.core.DockerClientImpl
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.runtime.RuntimeProvider
 import java.nio.file.Path
 import java.time.Duration
@@ -111,13 +111,13 @@ class DockerRuntimeProvider(
             val bytes = ramMB * 1024L * 1024L
             hostConfig.withMemory(bytes)
             hostConfig.withMemorySwap(bytes) // Disable swap
-            log("Docker container '$containerName' memory limit: ${ramMB}MB", LogType.INFORMATION)
+            log("Docker container '$containerName' memory limit: ${ramMB}MB")
         }
         if (cpu > 0) {
             // cpu units: 100 = 1 core worth of CPU time
             val nanoCpus = cpu * 10_000_000L
             hostConfig.withNanoCPUs(nanoCpus)
-            log("Docker container '$containerName' CPU limit: ${cpu} units (${nanoCpus / 1_000_000_000.0} cores)", LogType.INFORMATION)
+            log("Docker container '$containerName' CPU limit: ${cpu} units (${nanoCpus / 1_000_000_000.0} cores)")
         }
 
         val createCmd = dockerClient.createContainerCmd(imageRef)
@@ -158,7 +158,7 @@ class DockerRuntimeProvider(
             )
         }
 
-        log("Started Docker container '$containerName' (id=${createResponse.id}) for instance $instanceId on port $port", LogType.SUCCESS)
+        log("Started Docker container '$containerName' (id=${createResponse.id}) for instance $instanceId on port $port", LogLevel.SUCCESS)
 
         // Return a synthetic ProcessHandle that delegates to the container
         return DockerProcessHandle(createResponse.id, dockerClient)
@@ -171,27 +171,29 @@ class DockerRuntimeProvider(
             if (!config.autoRemove) {
                 dockerClient.removeContainerCmd(containerId).withForce(true).exec()
             }
-            log("Stopped Docker container for instance $instanceId", LogType.INFORMATION)
+            log("Stopped Docker container for instance $instanceId")
         } catch (e: Exception) {
-            log("Failed to stop Docker container for instance $instanceId: ${e.message}", LogType.ERROR)
+            log("Failed to stop Docker container for instance $instanceId: ${e.message}", LogLevel.ERROR)
         }
     }
 
     override fun executeCommand(instanceId: String, command: String) {
         val containerId = containerIds[instanceId]
-            ?: return log("No Docker container found for instance $instanceId", LogType.WARNING)
+            ?: return log("No Docker container found for instance $instanceId", LogLevel.WARNING)
 
         try {
             val exec = dockerClient.execCreateCmd(containerId)
-                .withCmd("sh", "-c", command)
+                .withCmd(command)
+                .withTty(true)
+                .withAttachStdin(true)
                 .withAttachStdout(true)
                 .withAttachStderr(true)
                 .exec()
 
             dockerClient.execStartCmd(exec.id).exec(com.github.dockerjava.api.async.ResultCallback.Adapter())
-            log("Executed command in Docker container for instance $instanceId: $command", LogType.INFORMATION)
+            log("Executed command in Docker container for instance $instanceId: $command")
         } catch (e: Exception) {
-            log("Failed to execute command in Docker container for instance $instanceId: ${e.message}", LogType.ERROR)
+            log("Failed to execute command in Docker container for instance $instanceId: ${e.message}", LogLevel.ERROR)
         }
     }
 
@@ -261,7 +263,7 @@ class DockerRuntimeProvider(
             return
         }
 
-        log("Image '$imageRef' not found locally, pulling...", LogType.INFORMATION)
+        log("Image '$imageRef' not found locally, pulling...")
 
         val latch = java.util.concurrent.CountDownLatch(1)
         var pullError: Throwable? = null
@@ -288,7 +290,7 @@ class DockerRuntimeProvider(
             throw RuntimeException("Failed to pull Docker image '$imageRef': ${pullError.message}", pullError)
         }
 
-        log("Image '$imageRef' pulled successfully", LogType.SUCCESS)
+        log("Image '$imageRef' pulled successfully", LogLevel.SUCCESS)
     }
 
     private fun createDockerClient(): DockerClient {

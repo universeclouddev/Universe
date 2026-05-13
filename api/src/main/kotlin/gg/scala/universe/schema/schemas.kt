@@ -43,7 +43,7 @@ data class Configuration(
     val hostAddress: String = "127.0.0.1",
     val availablePorts: PortRange = PortRange(25565, 25570),
     val minimumServiceCount: Int = 1,
-    val environmentVariables: Map<String, String> = emptyMap(),
+    val environmentVariables: Map<String, String> = mapOf("UNIVERSE_INSTANCE_ID" to "%INSTANCE_ID%"),
     val templateInstallationConfig: TemplateInstallationConfig = TemplateInstallationConfig(),
     val fileModifications: List<String> = emptyList(),
     val properties: Map<String, String> = emptyMap(),

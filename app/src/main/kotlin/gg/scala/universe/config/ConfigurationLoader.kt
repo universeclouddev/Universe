@@ -2,8 +2,8 @@ package gg.scala.universe.config
 
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.schema.Configuration
 import gg.scala.universe.schema.PortRange
@@ -24,7 +24,7 @@ object ConfigurationLoader {
     fun load(clusterStateService: ClusterStateService) {
         val dir = Path.of(CONFIGURATION_DIR)
         if (!dir.exists()) {
-            log("Configuration directory not found at $CONFIGURATION_DIR, creating it...", LogType.WARNING)
+            log("Configuration directory not found at $CONFIGURATION_DIR, creating it...", LogLevel.WARNING)
             Files.createDirectories(dir)
         }
 
@@ -34,13 +34,13 @@ object ConfigurationLoader {
             .toList()
 
         if (configFiles.isEmpty()) {
-            log("No configuration files found in $CONFIGURATION_DIR, creating default configuration...", LogType.WARNING)
+            log("No configuration files found in $CONFIGURATION_DIR, creating default configuration...", LogLevel.WARNING)
             val defaultConfig = createDefaultConfiguration()
             val defaultPath = dir.resolve("lobby.json")
             val prettyGson = gson.newBuilder().setPrettyPrinting().create()
             defaultPath.writeText(prettyGson.toJson(defaultConfig))
             clusterStateService.putConfiguration(defaultConfig)
-            log("Created and loaded default configuration '${defaultConfig.name}' from $defaultPath", LogType.INFORMATION)
+            log("Created and loaded default configuration '${defaultConfig.name}' from $defaultPath")
             return
         }
 
@@ -51,22 +51,22 @@ object ConfigurationLoader {
                 val configuration = gson.fromJson(content, Configuration::class.java)
                 clusterStateService.putConfiguration(configuration)
                 loadedCount++
-                log("Loaded configuration '${configuration.name}' from $path", LogType.INFORMATION)
+                log("Loaded configuration '${configuration.name}' from $path")
             } catch (e: JsonSyntaxException) {
-                log("Failed to parse configuration file $path: ${e.message}", LogType.ERROR)
+                log("Failed to parse configuration file $path: ${e.message}", LogLevel.ERROR)
             } catch (e: Exception) {
-                log("Failed to load configuration file $path: ${e.message}", LogType.ERROR)
+                log("Failed to load configuration file $path: ${e.message}", LogLevel.ERROR)
             }
         }
 
         if (loadedCount == 0) {
-            log("No valid configuration files loaded, creating default configuration...", LogType.WARNING)
+            log("No valid configuration files loaded, creating default configuration...", LogLevel.WARNING)
             val defaultConfig = createDefaultConfiguration()
             val defaultPath = dir.resolve("lobby.json")
             val prettyGson = gson.newBuilder().setPrettyPrinting().create()
             defaultPath.writeText(prettyGson.toJson(defaultConfig))
             clusterStateService.putConfiguration(defaultConfig)
-            log("Created and loaded default configuration '${defaultConfig.name}' from $defaultPath", LogType.INFORMATION)
+            log("Created and loaded default configuration '${defaultConfig.name}' from $defaultPath")
         }
     }
 

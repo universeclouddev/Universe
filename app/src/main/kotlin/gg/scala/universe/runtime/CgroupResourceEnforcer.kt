@@ -1,7 +1,7 @@
 package gg.scala.universe.runtime
 
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -44,10 +44,10 @@ object CgroupResourceEnforcer {
                 Files.write(cgroupPath.resolve("cpu.max"), "$quota $period".toByteArray())
             }
 
-            log("Created cgroup v2 for instance $instanceId at $cgroupPath (ram=${ramMB}MB, cpu=$cpu)", LogType.INFORMATION)
+            log("Created cgroup v2 for instance $instanceId at $cgroupPath (ram=${ramMB}MB, cpu=$cpu)")
             cgroupPath
         } catch (e: Exception) {
-            log("Failed to create cgroup for instance $instanceId: ${e.message}. Resource limits will not be enforced.", LogType.WARNING)
+            log("Failed to create cgroup for instance $instanceId: ${e.message}. Resource limits will not be enforced.", LogLevel.WARNING)
             null
         }
     }
@@ -60,7 +60,7 @@ object CgroupResourceEnforcer {
             Files.write(cgroupPath.resolve("cgroup.procs"), pid.toString().toByteArray())
             true
         } catch (e: Exception) {
-            log("Failed to move PID $pid into cgroup $cgroupPath: ${e.message}", LogType.WARNING)
+            log("Failed to move PID $pid into cgroup $cgroupPath: ${e.message}", LogLevel.WARNING)
             false
         }
     }
@@ -114,10 +114,10 @@ object CgroupResourceEnforcer {
                     }
                 }
                 Files.deleteIfExists(cgroupPath)
-                log("Cleaned up cgroup for instance $instanceId", LogType.INFORMATION)
+                log("Cleaned up cgroup for instance $instanceId")
             }
         } catch (e: Exception) {
-            log("Failed to clean up cgroup for instance $instanceId: ${e.message}", LogType.WARNING)
+            log("Failed to clean up cgroup for instance $instanceId: ${e.message}", LogLevel.WARNING)
         }
     }
 }

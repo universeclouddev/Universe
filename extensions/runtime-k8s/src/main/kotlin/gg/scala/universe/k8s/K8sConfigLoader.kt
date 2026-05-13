@@ -1,7 +1,7 @@
 package gg.scala.universe.k8s
 
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.util.json.Serializers
 import java.nio.file.Files
 import java.nio.file.Path
@@ -22,8 +22,8 @@ object K8sConfigLoader {
                 Serializers.GSON.fromJson(reader, K8sConfig::class.java)
             }
         } catch (e: Exception) {
-            log("Failed to load k8s config from $CONFIG_FILE: ${e.message}", LogType.ERROR)
-            log("Defaulting to base k8s config", LogType.ERROR)
+            log("Failed to load k8s config from $CONFIG_FILE: ${e.message}", LogLevel.ERROR)
+            log("Defaulting to base k8s config", LogLevel.ERROR)
             K8sConfig()
         }
     }
@@ -35,7 +35,7 @@ object K8sConfigLoader {
                 Serializers.GSON.toJson(config, writer)
             }
         } catch (e: Exception) {
-            log("Failed to save k8s config to $CONFIG_FILE: ${e.message}", LogType.ERROR)
+            log("Failed to save k8s config to $CONFIG_FILE: ${e.message}", LogLevel.ERROR)
         }
     }
 }

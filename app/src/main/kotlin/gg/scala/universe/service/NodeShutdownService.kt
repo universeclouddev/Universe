@@ -3,8 +3,8 @@ package gg.scala.universe.service
 import com.google.inject.Inject
 import com.google.inject.Singleton
 import com.hazelcast.core.HazelcastInstance
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.runtime.PortAllocator
 import gg.scala.universe.runtime.RuntimeRegistry
@@ -32,19 +32,37 @@ class NodeShutdownService @Inject constructor(
      * Releases ports, node resources, and cleans up working directories.
      */
     fun stopAllLocalInstances() {
-        val localNodeId = hazelcastInstance.cluster.localMember.uuid.toString()
-        val localInstances = clusterStateService.getAllInstances()
-            .filter { it.wrapperNodeId == localNodeId }
-
-        if (localInstances.isEmpty()) {
-            log("No local instances to stop", LogType.INFORMATION)
+        val localNodeId = try {
+            hazelcastInstance.cluster.localMember.uuid.toString()
+        } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
+            log("Hazelcast already shut down, skipping local instance cleanup")
+            return
+        } catch (_: IllegalStateException) {
+            log("Hazelcast not available, skipping local instance cleanup")
             return
         }
 
-        log("Stopping ${localInstances.size} local instance(s)...", LogType.INFORMATION)
+        val localInstances = try {
+            clusterStateService.getAllInstances()
+                .filter { it.wrapperNodeId == localNodeId }
+        } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
+            log("Hazelcast already shut down, skipping local instance cleanup")
+            return
+        }
+
+        if (localInstances.isEmpty()) {
+            log("No local instances to stop")
+            return
+        }
+
+        log("Stopping ${localInstances.size} local instance(s)...")
 
         for (instance in localInstances) {
-            val config = clusterStateService.getConfiguration(instance.configurationName)
+            val config = try {
+                clusterStateService.getConfiguration(instance.configurationName)
+            } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
+                null
+            }
             // Use the runtime stored at instance creation time so config reloads
             // don't cause us to stop instances with the wrong provider.
             val runtimeKey = instance.runtime
@@ -54,9 +72,9 @@ class NodeShutdownService @Inject constructor(
             if (runtimeProvider != null) {
                 try {
                     runtimeProvider.stop(instance.id)
-                    log("Stopped instance ${instance.id} (runtime=$runtimeKey)", LogType.INFORMATION)
+                    log("Stopped instance ${instance.id} (runtime=$runtimeKey)")
                 } catch (e: Exception) {
-                    log("Failed to stop instance ${instance.id}: ${e.message}", LogType.WARNING)
+                    log("Failed to stop instance ${instance.id}: ${e.message}", LogLevel.WARNING)
                 }
             }
 
@@ -64,7 +82,11 @@ class NodeShutdownService @Inject constructor(
             portAllocator.release(instance.allocatedPort)
 
             // Release node resources
-            clusterStateService.removeNodeResources(localNodeId, instance.allocatedRamMB, instance.allocatedCpu)
+            try {
+                clusterStateService.removeNodeResources(localNodeId, instance.allocatedRamMB, instance.allocatedCpu)
+            } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
+                // Hazelcast down — resources will be cleaned up on next startup
+            }
 
             // Clean up working directory for non-static instances
             if (config?.static != true) {
@@ -74,17 +96,21 @@ class NodeShutdownService @Inject constructor(
                         Files.walk(workingDir)
                             .sorted(Comparator.reverseOrder())
                             .forEach { Files.deleteIfExists(it) }
-                        log("Cleaned up working directory for instance ${instance.id}", LogType.INFORMATION)
+                        log("Cleaned up working directory for instance ${instance.id}")
                     }
                 } catch (cleanupEx: Exception) {
-                    log("Failed to clean up working directory for instance ${instance.id}: ${cleanupEx.message}", LogType.WARNING)
+                    log("Failed to clean up working directory for instance ${instance.id}: ${cleanupEx.message}", LogLevel.WARNING)
                 }
             }
 
             // Mark as STOPPED
-            clusterStateService.updateInstanceState(instance.id, InstanceState.STOPPED)
+            try {
+                clusterStateService.updateInstanceState(instance.id, InstanceState.STOPPED)
+            } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
+                // Hazelcast down — state will be reconciled on next startup
+            }
         }
 
-        log("All local instances stopped", LogType.SUCCESS)
+        log("All local instances stopped", LogLevel.SUCCESS)
     }
 }

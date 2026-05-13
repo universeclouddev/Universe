@@ -2,8 +2,8 @@ package gg.scala.universe.command.commands
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.command.CommandSource
 import gg.scala.universe.config.ConfigurationLoader
 import gg.scala.universe.extension.ExtensionService
@@ -24,6 +24,7 @@ import org.incendo.cloud.annotations.Argument
 import org.incendo.cloud.annotations.Command
 import com.hazelcast.core.HazelcastInstance
 import gg.scala.universe.hz.nodeName
+import kotlinx.coroutines.delay
 import java.nio.file.Path
 import java.nio.file.Files
 import kotlin.io.path.exists
@@ -471,8 +472,8 @@ class ManagementCommands @Inject constructor(
     // ─── System Commands ───
 
     @Command("stop|exit")
-    fun stop(source: CommandSource) {
-        source.sendMessage("Shutting down Universe...")
+    suspend fun stop(source: CommandSource) {
+        delay(250)
         Runtime.getRuntime().exit(0)
     }
 

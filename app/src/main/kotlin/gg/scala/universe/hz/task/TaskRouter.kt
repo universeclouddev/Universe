@@ -2,8 +2,8 @@ package gg.scala.universe.hz.task
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.runtime.PortAllocator
 import gg.scala.universe.runtime.RuntimeRegistry
@@ -38,16 +38,16 @@ class TaskRouter @Inject constructor(
     }
 
     private fun handleDeploy(task: DeployInstanceTask) {
-        log("Routing deploy task for instance ${task.instanceId}", LogType.INFORMATION)
+        log("Routing deploy task for instance ${task.instanceId}")
 
         val configuration = clusterStateService.getConfiguration(task.configurationName)
-            ?: return log("Configuration ${task.configurationName} not found for instance ${task.instanceId}", LogType.ERROR)
+            ?: return log("Configuration ${task.configurationName} not found for instance ${task.instanceId}", LogLevel.ERROR)
 
         val runtimeProvider = runtimeRegistry.get(configuration.runtime)
-            ?: return log("Runtime '${configuration.runtime}' not registered for instance ${task.instanceId}", LogType.ERROR)
+            ?: return log("Runtime '${configuration.runtime}' not registered for instance ${task.instanceId}", LogLevel.ERROR)
 
         val allocatedPort = portAllocator.allocate(configuration.availablePorts)
-            ?: return log("No available ports for instance ${task.instanceId} in range ${configuration.availablePorts.min}-${configuration.availablePorts.max}", LogType.ERROR)
+            ?: return log("No available ports for instance ${task.instanceId} in range ${configuration.availablePorts.min}-${configuration.availablePorts.max}", LogLevel.ERROR)
 
         val workingDir = if (configuration.static) {
             Paths.get("./static/${configuration.name}").toAbsolutePath().normalize()
@@ -89,7 +89,7 @@ class TaskRouter @Inject constructor(
         } catch (e: Exception) {
             val cause = e.cause ?: e
             val reason = "${cause.javaClass.simpleName}: ${cause.message ?: "no details"}"
-            log("Failed to start instance ${task.instanceId}: $reason", LogType.ERROR)
+            log("Failed to start instance ${task.instanceId}: $reason", LogLevel.ERROR)
 
             // Clean up: remove instance record
             clusterStateService.removeInstance(task.instanceId)
@@ -101,10 +101,10 @@ class TaskRouter @Inject constructor(
                         Files.walk(workingDir)
                             .sorted(Comparator.reverseOrder())
                             .forEach { Files.deleteIfExists(it) }
-                        log("Cleaned up working directory for instance ${task.instanceId}", LogType.INFORMATION)
+                        log("Cleaned up working directory for instance ${task.instanceId}")
                     }
                 } catch (cleanupEx: Exception) {
-                    log("Failed to clean up working directory for instance ${task.instanceId}: ${cleanupEx.message}", LogType.WARNING)
+                    log("Failed to clean up working directory for instance ${task.instanceId}: ${cleanupEx.message}", LogLevel.WARNING)
                 }
             }
 
@@ -144,14 +144,14 @@ class TaskRouter @Inject constructor(
             runtime = configuration.runtime
         ))
 
-        log("Instance ${task.instanceId} deployed with PID ${processHandle.pid()}", LogType.SUCCESS)
+        log("Instance ${task.instanceId} deployed with PID ${processHandle.pid()}", LogLevel.SUCCESS)
     }
 
     private fun handleStop(task: StopInstanceTask) {
-        log("Routing stop task for instance ${task.instanceId}", LogType.INFORMATION)
+        log("Routing stop task for instance ${task.instanceId}")
 
         val instance = clusterStateService.getInstance(task.instanceId)
-            ?: return log("Instance ${task.instanceId} not found", LogType.WARNING)
+            ?: return log("Instance ${task.instanceId} not found", LogLevel.WARNING)
 
         // Use the runtime that was stored at instance creation time, not the current config,
         // so config reloads/changes don't break stopping existing instances.
@@ -159,7 +159,7 @@ class TaskRouter @Inject constructor(
 
         val runtimeProvider = runtimeRegistry.get(runtimeKey)
             ?: runtimeRegistry.getAll().values.firstOrNull()
-            ?: return log("No runtime provider '$runtimeKey' available to stop instance ${task.instanceId}", LogType.ERROR)
+            ?: return log("No runtime provider '$runtimeKey' available to stop instance ${task.instanceId}", LogLevel.ERROR)
 
         val configuration = clusterStateService.getConfiguration(instance.configurationName)
 
@@ -167,11 +167,11 @@ class TaskRouter @Inject constructor(
         try {
             if (runtimeProvider.isRunning(task.instanceId)) {
                 runtimeProvider.executeCommand(task.instanceId, "stop")
-                log("Sent graceful stop command to instance ${task.instanceId}, waiting 30s...", LogType.INFORMATION)
+                log("Sent graceful stop command to instance ${task.instanceId}, waiting 30s...")
                 Thread.sleep(30000)
             }
         } catch (e: Exception) {
-            log("Graceful stop failed for instance ${task.instanceId}: ${e.message}, forcing...", LogType.WARNING)
+            log("Graceful stop failed for instance ${task.instanceId}: ${e.message}, forcing...", LogLevel.WARNING)
         }
 
         runtimeProvider.stop(task.instanceId)
@@ -186,10 +186,10 @@ class TaskRouter @Inject constructor(
                     Files.walk(workingDir)
                         .sorted(Comparator.reverseOrder())
                         .forEach { Files.deleteIfExists(it) }
-                    log("Cleaned up working directory for instance ${task.instanceId}", LogType.INFORMATION)
+                    log("Cleaned up working directory for instance ${task.instanceId}")
                 }
             } catch (cleanupEx: Exception) {
-                log("Failed to clean up working directory for instance ${task.instanceId}: ${cleanupEx.message}", LogType.WARNING)
+                log("Failed to clean up working directory for instance ${task.instanceId}: ${cleanupEx.message}", LogLevel.WARNING)
             }
         }
 
@@ -197,21 +197,21 @@ class TaskRouter @Inject constructor(
         clusterStateService.removeNodeResources(instance.wrapperNodeId, instance.allocatedRamMB, instance.allocatedCpu)
 
         clusterStateService.updateInstanceState(task.instanceId, InstanceState.STOPPED)
-        log("Instance ${task.instanceId} stopped", LogType.INFORMATION)
+        log("Instance ${task.instanceId} stopped")
     }
 
     private fun handleExecute(task: ExecuteCommandTask) {
-        log("Routing execute command for instance ${task.instanceId}: ${task.command}", LogType.INFORMATION)
+        log("Routing execute command for instance ${task.instanceId}: ${task.command}")
 
         val instance = clusterStateService.getInstance(task.instanceId)
-            ?: return log("Instance ${task.instanceId} not found", LogType.WARNING)
+            ?: return log("Instance ${task.instanceId} not found", LogLevel.WARNING)
 
         val configuration = clusterStateService.getConfiguration(instance.configurationName)
         val runtimeKey = configuration?.runtime ?: instance.configurationName
 
         val runtimeProvider = runtimeRegistry.get(runtimeKey)
             ?: runtimeRegistry.getAll().values.firstOrNull()
-            ?: return log("No runtime provider available to execute command on instance ${task.instanceId}", LogType.ERROR)
+            ?: return log("No runtime provider available to execute command on instance ${task.instanceId}", LogLevel.ERROR)
 
         runtimeProvider.executeCommand(task.instanceId, task.command)
     }
@@ -222,7 +222,7 @@ class TaskRouter @Inject constructor(
             val json = Serializers.GSON.toJson(instance)
             Files.writeString(stateFile, json)
         } catch (e: Exception) {
-            log("Failed to write state file for instance ${instance.id}: ${e.message}", LogType.WARNING)
+            log("Failed to write state file for instance ${instance.id}: ${e.message}", LogLevel.WARNING)
         }
     }
 

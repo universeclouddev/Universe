@@ -1,8 +1,8 @@
 package gg.scala.universe.k8s
 
 import com.google.inject.Inject
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.extension.Extension
 import gg.scala.universe.runtime.RuntimeRegistry
 
@@ -20,17 +20,17 @@ class K8sExtension : Extension {
         config = K8sConfigLoader.load()
         val provider = K8sRuntimeProvider(config)
         runtimeRegistry.register(config.factoryName, provider)
-        log("Kubernetes runtime extension loaded (image=${config.image}, namespace=${config.namespace})", LogType.SUCCESS)
+        log("Kubernetes runtime extension loaded (image=${config.image}, namespace=${config.namespace})", LogLevel.SUCCESS)
     }
 
     override fun onUnload() {
         runtimeRegistry.unregister(config.factoryName)
-        log("Kubernetes runtime extension unloaded", LogType.INFORMATION)
+        log("Kubernetes runtime extension unloaded")
     }
 
     override fun onReload() {
         onUnload()
         onLoad()
-        log("Kubernetes runtime extension reloaded", LogType.INFORMATION)
+        log("Kubernetes runtime extension reloaded")
     }
 }

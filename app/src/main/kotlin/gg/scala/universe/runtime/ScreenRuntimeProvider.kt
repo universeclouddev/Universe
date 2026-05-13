@@ -1,8 +1,8 @@
 package gg.scala.universe.runtime
 
 import com.google.inject.Singleton
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 
@@ -53,7 +53,7 @@ class ScreenRuntimeProvider : RuntimeProvider {
             CgroupResourceEnforcer.movePidToCgroup(handle.pid(), cgroupPath)
         }
 
-        log("Started screen session '$sessionName' for instance $instanceId (PID ${handle.pid()})", LogType.SUCCESS)
+        log("Started screen session '$sessionName' for instance $instanceId (PID ${handle.pid()})", LogLevel.SUCCESS)
         return handle
     }
 
@@ -62,7 +62,7 @@ class ScreenRuntimeProvider : RuntimeProvider {
         silentExec("screen", "-S", sessionName, "-X", "quit")
         sessions.remove(instanceId)
         CgroupResourceEnforcer.cleanupCgroup(instanceId)
-        log("Stopped screen session '$sessionName' for instance $instanceId", LogType.INFORMATION)
+        log("Stopped screen session '$sessionName' for instance $instanceId")
     }
 
     override fun executeCommand(instanceId: String, command: String) {
@@ -71,7 +71,7 @@ class ScreenRuntimeProvider : RuntimeProvider {
             .inheritIO()
             .start()
         process.waitFor()
-        log("Executed command on screen session '$sessionName': $command", LogType.INFORMATION)
+        log("Executed command on screen session '$sessionName': $command")
     }
 
     override fun isRunning(instanceId: String): Boolean {

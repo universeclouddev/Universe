@@ -1,8 +1,8 @@
 package gg.scala.universe.s3
 
 import com.google.inject.Inject
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.extension.Extension
 import gg.scala.universe.template.TemplateStorageRegistry
 
@@ -25,18 +25,18 @@ class S3Extension : Extension {
 
     override fun onLoad() {
         templateStorageRegistry.register(s3TemplateStorage)
-        log("S3 template storage extension loaded (bucket=${s3TemplateStorage.bucket})", LogType.SUCCESS)
+        log("S3 template storage extension loaded (bucket=${s3TemplateStorage.bucket})", LogLevel.SUCCESS)
     }
 
     override fun onUnload() {
         templateStorageRegistry.unregister(s3TemplateStorage.storageKey)
         s3TemplateStorage.close()
-        log("S3 template storage extension unloaded", LogType.INFORMATION)
+        log("S3 template storage extension unloaded")
     }
 
     override fun onReload() {
         onUnload()
         onLoad()
-        log("S3 template storage extension reloaded", LogType.INFORMATION)
+        log("S3 template storage extension reloaded")
     }
 }

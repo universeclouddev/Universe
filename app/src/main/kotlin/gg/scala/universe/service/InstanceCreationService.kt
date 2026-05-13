@@ -4,8 +4,8 @@ import com.google.inject.Inject
 import com.google.inject.Singleton
 import com.hazelcast.cluster.Member
 import com.hazelcast.core.HazelcastInstance
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.task.TaskDispatcher
 import gg.scala.universe.schema.Configuration
@@ -41,7 +41,7 @@ class InstanceCreationService @Inject constructor(
             log(
                 "No node has enough resources (RAM=${configuration.ramMB}MB, CPU=${configuration.cpu}) " +
                 "for instance '$id'.",
-                LogType.WARNING
+                LogLevel.WARNING
             )
             return null
         }

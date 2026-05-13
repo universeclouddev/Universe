@@ -23,11 +23,33 @@ object ConsoleRenderer {
      */
     fun printBanner(configuration: UniverseMainConfiguration) {
         val roleStyle = if (configuration.isMasterNode) SUCCESS else WARNING
-        val role = styled(roleStyle, if (configuration.isMasterNode) "Master" else "Wrapper")
+        val role = styled(roleStyle, if (configuration.isMasterNode) "master" else "wrapper")
         val nodeName = styled(PRIMARY_BOLD, configuration.nodeId)
         val addr = styled(AttributedStyle.DEFAULT.foreground(AttributedStyle.MAGENTA),
             "${configuration.address}:${configuration.port}")
 
+        println()
+        println("  ${styled(PRIMARY_BOLD, "██╗   ██╗███╗   ██╗██╗██╗   ██╗███████╗██████╗ ███████╗███████╗")}")
+        println("  ${styled(PRIMARY_BOLD, "██║   ██║████╗  ██║██║██║   ██║██╔════╝██╔══██╗██╔════╝██╔════╝")}")
+        println("  ${styled(PRIMARY_BOLD, "██║   ██║██╔██╗ ██║██║██║   ██║█████╗  ██████╔╝███████╗█████╗  ")}")
+        println("  ${styled(PRIMARY_BOLD, "██║   ██║██║╚██╗██║██║╚██╗ ██╔╝██╔══╝  ██╔══██╗╚════██║██╔══╝  ")}")
+        println("  ${styled(PRIMARY_BOLD, "╚██████╔╝██║ ╚████║██║ ╚████╔╝ ███████╗██║  ██║███████║███████╗")}")
+        println("  ${styled(PRIMARY_BOLD, " ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝")}")
+        println("                                             ${styled(MUTED, "_.oo.")}")
+        println("                      ${styled(MUTED, "_.u[[/;:,.         .odMMMMMM'")}")
+        println("                   ${styled(MUTED, ".o888uu[[[/;:-.  .o@P^    MMM^")}")
+        println("                  ${styled(MUTED, "oN88888UU[[[/;::-.        dP^")}")
+        println("                 ${styled(MUTED, "dNMMNN888UU[[[/;:--.   .o@P^")}")
+        println("                ${styled(MUTED, "MMMMMMN888UU[[[/;::-. o@^")}")
+        println("                ${styled(MUTED, "NNMMMMNN888UU[[[/~.o@P^")}")
+        println("                ${styled(MUTED, "888888888UU[[[/o@^-..")}")
+        println("               ${styled(MUTED, "oI8888UU[[[/o@P^:--..")}")
+        println("             ${styled(MUTED, ".@^  YUU[[[/o@^;::---..")}")
+        println("           ${styled(MUTED, "oMP     ^/o@P^;:::---..")}")
+        println("        ${styled(MUTED, ".dMMM    .o@^ ^;::---...")}")
+        println("       ${styled(MUTED, "dMMMMMMM@^     ^^^^")}")
+        println("      ${styled(MUTED, "YMMMUP^")}")
+        println("       ${styled(MUTED, "^^")}")
         println()
         println("  ${styled(PRIMARY_BOLD, "┌────────────────────────────────────────────┐")}")
         println("  ${styled(PRIMARY_BOLD, "│")}  ${styled(BOLD_DEFAULT, "Universe")} ${styled(MUTED, "Orchestrator")}                        ${styled(PRIMARY_BOLD, "│")}")
@@ -55,7 +77,7 @@ object ConsoleRenderer {
             .styled(MUTED, "@")
             .styled(PRIMARY, nodeId)
             .append(" ")
-            .styled(MUTED, "> ")
+            .styled(MUTED, "› ")
             .toAttributedString()
     }
 

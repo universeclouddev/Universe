@@ -3,8 +3,8 @@ package gg.scala.universe.service
 import com.google.inject.Inject
 import com.google.inject.Singleton
 import com.hazelcast.core.HazelcastInstance
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.runtime.PortAllocator
 import gg.scala.universe.runtime.RuntimeRegistry
@@ -36,7 +36,7 @@ class InstanceRecoveryService @Inject constructor(
 
     fun recover() {
         val localNodeId = hazelcastInstance.cluster.localMember.uuid.toString()
-        log("Recovering instances for node $localNodeId...", LogType.INFORMATION)
+        log("Recovering instances for node $localNodeId...")
 
         val recovered = mutableSetOf<String>()
 
@@ -66,7 +66,7 @@ class InstanceRecoveryService @Inject constructor(
                                     recovered.add(instance.id)
                                 }
                             } catch (e: Exception) {
-                                log("Failed to parse state file in $dir: ${e.message}", LogType.WARNING)
+                                log("Failed to parse state file in $dir: ${e.message}", LogLevel.WARNING)
                             }
                         }
                     }
@@ -96,15 +96,15 @@ class InstanceRecoveryService @Inject constructor(
                     recovered.add(instance.id)
                 } else {
                     // Unknown running instance — can't recover without metadata, log and skip
-                    log("Found unknown running instance '$id' via runtime '$runtimeKey', skipping recovery", LogType.WARNING)
+                    log("Found unknown running instance '$id' via runtime '$runtimeKey', skipping recovery", LogLevel.WARNING)
                 }
             }
         }
 
         if (recovered.isEmpty()) {
-            log("No instances to recover", LogType.INFORMATION)
+            log("No instances to recover")
         } else {
-            log("Recovered ${recovered.size} instance(s): ${recovered.joinToString(", ")}", LogType.SUCCESS)
+            log("Recovered ${recovered.size} instance(s): ${recovered.joinToString(", ")}", LogLevel.SUCCESS)
         }
     }
 
@@ -121,13 +121,13 @@ class InstanceRecoveryService @Inject constructor(
             ?: runtimeRegistry.getAll().values.firstOrNull()
 
         if (provider == null) {
-            log("No runtime provider for recovered instance ${instance.id}, marking OFFLINE", LogType.WARNING)
+            log("No runtime provider for recovered instance ${instance.id}, marking OFFLINE", LogLevel.WARNING)
             clusterStateService.updateInstanceState(instance.id, InstanceState.OFFLINE)
             return false
         }
 
         if (!provider.isRunning(instance.id)) {
-            log("Instance ${instance.id} is no longer running, cleaning up", LogType.WARNING)
+            log("Instance ${instance.id} is no longer running, cleaning up", LogLevel.WARNING)
             cleanupDeadInstance(instance, config)
             return false
         }
@@ -145,7 +145,7 @@ class InstanceRecoveryService @Inject constructor(
         // Track node resources
         clusterStateService.addNodeResources(instance.wrapperNodeId, instance.allocatedRamMB, instance.allocatedCpu)
 
-        log("Recovered instance ${instance.id} (config=${instance.configurationName}, port=${instance.allocatedPort})", LogType.SUCCESS)
+        log("Recovered instance ${instance.id} (config=${instance.configurationName}, port=${instance.allocatedPort})", LogLevel.SUCCESS)
         return true
     }
 

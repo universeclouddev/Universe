@@ -2,8 +2,8 @@ package gg.scala.universe.template
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.schema.Configuration
 import gg.scala.universe.schema.Template
 import gg.scala.universe.schema.TemplateInstallationConfig
@@ -59,7 +59,7 @@ class TemplateManager @Inject constructor(
         val selectedTemplates = resolveTemplates(config)
 
         if (selectedTemplates.isEmpty()) {
-            log("No templates to install for configuration '${configuration.name}'", LogType.WARNING)
+            log("No templates to install for configuration '${configuration.name}'", LogLevel.WARNING)
             return
         }
 
@@ -72,7 +72,7 @@ class TemplateManager @Inject constructor(
             selectedTemplates.sortedByDescending { it.priority }
         }
 
-        log("Installing ${sorted.size} template(s) for instance $instanceId (override=${config.onTemplatePasteOverridePresentFiles})", LogType.INFORMATION)
+        log("Installing ${sorted.size} template(s) for instance $instanceId (override=${config.onTemplatePasteOverridePresentFiles})")
 
         sorted.forEach { template ->
             if (template.storage != "local") {
@@ -80,19 +80,19 @@ class TemplateManager @Inject constructor(
                 if (provider != null) {
                     provider.downloadTemplate(template.group, template.name)
                 } else {
-                    log("No storage provider found for '${template.storage}', skipping template ${template.group}/${template.name}", LogType.WARNING)
+                    log("No storage provider found for '${template.storage}', skipping template ${template.group}/${template.name}", LogLevel.WARNING)
                     return@forEach
                 }
             }
 
             val sourceDir = templatesDir.resolve(template.group).resolve(template.name)
             if (!sourceDir.exists() || !sourceDir.isDirectory()) {
-                log("Template directory not found: $sourceDir", LogType.WARNING)
+                log("Template directory not found: $sourceDir", LogLevel.WARNING)
                 return@forEach
             }
 
             copyDirectory(sourceDir, targetDir, config.onTemplatePasteOverridePresentFiles)
-            log("Pasted template '${template.name}' from group '${template.group}'", LogType.INFORMATION)
+            log("Pasted template '${template.name}' from group '${template.group}'")
         }
 
         // Apply variable replacement
@@ -218,7 +218,7 @@ class TemplateManager @Inject constructor(
         configuration.fileModifications.forEach { relativePath ->
             val file = targetDir.resolve(relativePath)
             if (!file.exists()) {
-                log("File for modification not found: $file", LogType.WARNING)
+                log("File for modification not found: $file", LogLevel.WARNING)
                 return@forEach
             }
 
@@ -228,9 +228,9 @@ class TemplateManager @Inject constructor(
                     content = content.replace(placeholder, value)
                 }
                 file.writeText(content)
-                log("Applied variable replacements to $relativePath", LogType.INFORMATION)
+                log("Applied variable replacements to $relativePath")
             } catch (e: Exception) {
-                log("Failed to modify file $relativePath: ${e.message}", LogType.ERROR)
+                log("Failed to modify file $relativePath: ${e.message}", LogLevel.ERROR)
             }
         }
     }

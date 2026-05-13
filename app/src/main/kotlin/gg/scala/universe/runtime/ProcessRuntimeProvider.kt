@@ -1,8 +1,8 @@
 package gg.scala.universe.runtime
 
 import com.google.inject.Singleton
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 
@@ -58,7 +58,7 @@ class ProcessRuntimeProvider : RuntimeProvider {
             CgroupResourceEnforcer.movePidToCgroup(process.pid(), cgroupPath)
         }
 
-        log("Started process for instance $instanceId (PID ${process.pid()})", LogType.SUCCESS)
+        log("Started process for instance $instanceId (PID ${process.pid()})", LogLevel.SUCCESS)
         return process.toHandle()
     }
 
@@ -66,19 +66,19 @@ class ProcessRuntimeProvider : RuntimeProvider {
         val process = processes.remove(instanceId) ?: return
         process.destroy()
         CgroupResourceEnforcer.cleanupCgroup(instanceId)
-        log("Stopped process for instance $instanceId", LogType.INFORMATION)
+        log("Stopped process for instance $instanceId")
     }
 
     override fun executeCommand(instanceId: String, command: String) {
         val process = processes[instanceId]
-            ?: return log("No process found for instance $instanceId", LogType.WARNING)
+            ?: return log("No process found for instance $instanceId", LogLevel.WARNING)
 
         process.outputStream.bufferedWriter().use {
             it.write(command)
             it.newLine()
             it.flush()
         }
-        log("Executed command on instance $instanceId: $command", LogType.INFORMATION)
+        log("Executed command on instance $instanceId: $command")
     }
 
     override fun isRunning(instanceId: String): Boolean {

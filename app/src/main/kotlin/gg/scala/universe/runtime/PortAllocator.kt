@@ -2,8 +2,8 @@ package gg.scala.universe.runtime
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.schema.PortRange
 import java.net.ServerSocket
 import java.util.concurrent.ConcurrentHashMap
@@ -32,12 +32,12 @@ class PortAllocator @Inject constructor() {
 
             if (isPortAvailable(port)) {
                 allocatedPorts.add(port)
-                log("Allocated port $port (range ${range.min}-${range.max})", LogType.INFORMATION)
+                log("Allocated port $port (range ${range.min}-${range.max})")
                 return port
             }
         }
 
-        log("No available ports in range ${range.min}-${range.max}", LogType.ERROR)
+        log("No available ports in range ${range.min}-${range.max}", LogLevel.ERROR)
         return null
     }
 
@@ -46,7 +46,7 @@ class PortAllocator @Inject constructor() {
      */
     fun release(port: Int) {
         if (allocatedPorts.remove(port)) {
-            log("Released port $port", LogType.INFORMATION)
+            log("Released port $port")
         }
     }
 
@@ -56,7 +56,7 @@ class PortAllocator @Inject constructor() {
      */
     fun reserve(port: Int) {
         allocatedPorts.add(port)
-        log("Reserved port $port (recovered)", LogType.INFORMATION)
+        log("Reserved port $port (recovered)")
     }
 
     private fun isPortAvailable(port: Int): Boolean {

@@ -2,8 +2,8 @@ package gg.scala.universe.config
 
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -16,7 +16,7 @@ object ConfigLoader {
     fun load(): UniverseMainConfiguration {
         val path = Path.of(CONFIG_FILE)
         if (!path.exists()) {
-            log("Config file not found at $CONFIG_FILE, creating default config...", LogType.WARNING)
+            log("Config file not found at $CONFIG_FILE, creating default config...", LogLevel.WARNING)
             val defaultConfig = UniverseMainConfiguration()
             save(defaultConfig)
             return defaultConfig
@@ -25,9 +25,9 @@ object ConfigLoader {
         return try {
             val content = path.readText()
             gson.fromJson(content, UniverseMainConfiguration::class.java)
-                .also { log("Loaded main configuration from $CONFIG_FILE", LogType.INFORMATION) }
+                .also { log("Loaded main configuration from $CONFIG_FILE") }
         } catch (e: JsonSyntaxException) {
-            log("Failed to parse $CONFIG_FILE: ${e.message}", LogType.ERROR)
+            log("Failed to parse $CONFIG_FILE: ${e.message}", LogLevel.ERROR)
             UniverseMainConfiguration()
         }
     }
@@ -36,6 +36,6 @@ object ConfigLoader {
         val path = Path.of(CONFIG_FILE)
         val json = gson.newBuilder().setPrettyPrinting().create().toJson(config)
         path.writeText(json)
-        log("Saved main configuration to $CONFIG_FILE", LogType.INFORMATION)
+        log("Saved main configuration to $CONFIG_FILE")
     }
 }

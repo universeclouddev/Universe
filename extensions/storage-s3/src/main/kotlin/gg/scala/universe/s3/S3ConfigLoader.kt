@@ -1,7 +1,7 @@
 package gg.scala.universe.s3
 
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.util.json.Serializers
 import java.nio.file.Files
 import java.nio.file.Path
@@ -22,8 +22,8 @@ object S3ConfigLoader {
                 Serializers.GSON.fromJson(reader, S3Config::class.java)
             }
         } catch (e: Exception) {
-            log("Failed to load S3 config from $CONFIG_FILE: ${e.message}", LogType.ERROR)
-            log("Defaulting to base S3 config", LogType.ERROR)
+            log("Failed to load S3 config from $CONFIG_FILE: ${e.message}", LogLevel.ERROR)
+            log("Defaulting to base S3 config", LogLevel.ERROR)
             S3Config()
         }
     }
@@ -35,7 +35,7 @@ object S3ConfigLoader {
                 Serializers.GSON.toJson(config, writer)
             }
         } catch (e: Exception) {
-            log("Failed to save S3 config to $CONFIG_FILE: ${e.message}", LogType.ERROR)
+            log("Failed to save S3 config to $CONFIG_FILE: ${e.message}", LogLevel.ERROR)
         }
     }
 }

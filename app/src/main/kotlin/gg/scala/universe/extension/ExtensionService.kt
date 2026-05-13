@@ -2,8 +2,8 @@ package gg.scala.universe.extension
 
 import com.google.common.reflect.ClassPath
 import com.google.inject.Inject
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.app.UniverseApplication
 import okio.Path.Companion.toPath
 
@@ -17,7 +17,7 @@ class ExtensionService {
     private val loadedExtensions = mutableMapOf<String, Extension>()
 
     fun installExtensions() {
-        log("Installing extensions...", LogType.INFORMATION)
+        log("Installing extensions...")
         extensionPath.toFile().mkdirs()
 
         LoaderUtils.loadDirectory(DependencyLoader.classLoader(), extensionPath, "jar")
@@ -25,7 +25,7 @@ class ExtensionService {
             this.extensions[extension.id()] = extension
             app.injector.injectMembers(extension)
 
-            log("Found extension: ${extension.id()} v${extension.version()}", LogType.INFORMATION)
+            log("Found extension: ${extension.id()} v${extension.version()}")
         }
     }
 
@@ -34,8 +34,8 @@ class ExtensionService {
             it.value.onLoad()
             this.loadedExtensions[it.key] = it.value
         } catch (ex: Exception) {
-            log("Failed to load extension ${it.key}: ${ex.message}", LogType.ERROR)
-            log(ex)
+            log("Failed to load extension ${it.key}: ${ex.message}", LogLevel.ERROR)
+            log(ex.message ?: "Unknown error", LogLevel.ERROR)
         } }
     }
 
@@ -43,8 +43,8 @@ class ExtensionService {
         this.loadedExtensions.forEach { try {
             it.value.onReload()
         } catch (ex: Exception) {
-            log("Failed to reload extension ${it.key}: ${ex.message}", LogType.ERROR)
-            log(ex)
+            log("Failed to reload extension ${it.key}: ${ex.message}", LogLevel.ERROR)
+            log(ex.message ?: "Unknown error", LogLevel.ERROR)
         } }
     }
 
@@ -52,8 +52,8 @@ class ExtensionService {
         this.loadedExtensions.forEach { try {
             it.value.onUnload()
         } catch (ex: Exception) {
-            log("Failed to unload extension ${it.key}: ${ex.message}", LogType.ERROR)
-            log(ex)
+            log("Failed to unload extension ${it.key}: ${ex.message}", LogLevel.ERROR)
+            log(ex.message ?: "Unknown error", LogLevel.ERROR)
         } }
     }
 

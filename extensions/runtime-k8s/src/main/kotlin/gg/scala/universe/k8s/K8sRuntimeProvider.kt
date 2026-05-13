@@ -1,7 +1,7 @@
 package gg.scala.universe.k8s
 
-import cz.lukynka.prettylog.LogType
-import cz.lukynka.prettylog.log
+import gg.scala.universe.console.LogLevel
+import gg.scala.universe.console.log
 import gg.scala.universe.runtime.RuntimeProvider
 import io.fabric8.kubernetes.api.model.Container
 import io.fabric8.kubernetes.api.model.ContainerBuilder
@@ -28,6 +28,7 @@ import java.util.Optional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Stream
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * [RuntimeProvider] implementation using Kubernetes Pods.
@@ -45,9 +46,9 @@ class K8sRuntimeProvider(
     init {
         try {
             client = createKubernetesClient()
-            log("Connected to Kubernetes cluster", LogType.SUCCESS)
+            log("Connected to Kubernetes cluster", LogLevel.SUCCESS)
         } catch (e: Exception) {
-            log("Failed to connect to Kubernetes cluster: ${e.message}. K8s runtime will be unavailable.", LogType.WARNING)
+            log("Failed to connect to Kubernetes cluster: ${e.message}. K8s runtime will be unavailable.", LogLevel.WARNING)
         }
     }
 
@@ -88,6 +89,8 @@ class K8sRuntimeProvider(
             .withWorkingDir(config.workingDir)
             .addNewPort()
                 .withContainerPort(port)
+                .withHostPort(port)
+                .withProtocol("TCP")
             .endPort()
 
         // Working directory volume: hostPath for local, emptyDir for cloud
@@ -105,7 +108,7 @@ class K8sRuntimeProvider(
             // User is providing their own storage for the working directory (e.g., shared PVC)
             workVolume = null
             log("User-provided volumeMount covers working directory '${config.workingDir}'. " +
-                "Skipping default work volume.", LogType.INFORMATION)
+                "Skipping default work volume.")
         } else if (config.hostDataPath != null) {
             // Local mode: Universe is in Docker on the same host as the K8s node
             val hostWorkingDir = workingDir.toAbsolutePath().normalize().toString().replaceFirst(
@@ -121,7 +124,7 @@ class K8sRuntimeProvider(
                 .withName(workVolumeName)
                 .withMountPath(config.workingDir)
                 .endVolumeMount()
-            log("Mounting host working dir '$hostWorkingDir' into pod at '${config.workingDir}' (local mode)", LogType.INFORMATION)
+            log("Mounting host working dir '$hostWorkingDir' into pod at '${config.workingDir}' (local mode)")
         } else {
             // Cloud mode: K8s nodes are separate from Universe host. Use emptyDir.
             workVolume = VolumeBuilder()
@@ -134,7 +137,7 @@ class K8sRuntimeProvider(
                 .withMountPath(config.workingDir)
                 .endVolumeMount()
             log("Using emptyDir for pod working directory at '${config.workingDir}' (cloud mode). " +
-                "Ensure your container image or init container provides the required files.", LogType.WARNING)
+                "Ensure your container image or init container provides the required files.", LogLevel.WARNING)
         }
 
         // Resource limits
@@ -145,13 +148,13 @@ class K8sRuntimeProvider(
                 val q = Quantity("${ramMB}Mi")
                 limits["memory"] = q
                 requests["memory"] = q
-                log("K8s pod '$podName' memory limit: ${ramMB}Mi", LogType.INFORMATION)
+                log("K8s pod '$podName' memory limit: ${ramMB}Mi")
             }
             if (cpu > 0) {
                 val q = Quantity("${cpu}m")
                 limits["cpu"] = q
                 requests["cpu"] = q
-                log("K8s pod '$podName' CPU limit: ${cpu}m", LogType.INFORMATION)
+                log("K8s pod '$podName' CPU limit: ${cpu}m")
             }
             val resources = ResourceRequirementsBuilder().apply {
                 limits.forEach { (k, v) -> addToLimits(k, v) }
@@ -214,7 +217,7 @@ class K8sRuntimeProvider(
             .withVolumes(listOfNotNull(workVolume) + volumes)
         if (initContainers.isNotEmpty()) {
             podSpecBuilder.withInitContainers(initContainers)
-            log("Added ${initContainers.size} S3 template init container(s) for instance $instanceId", LogType.INFORMATION)
+            log("Added ${initContainers.size} S3 template init container(s) for instance $instanceId")
         }
         if (config.serviceAccount != null) {
             podSpecBuilder.withServiceAccountName(config.serviceAccount)
@@ -264,7 +267,7 @@ class K8sRuntimeProvider(
             )
         }
 
-        log("Started K8s pod '$podName' for instance $instanceId on port $port", LogType.SUCCESS)
+        log("Started K8s pod '$podName' for instance $instanceId on port $port", LogLevel.SUCCESS)
 
         return K8sProcessHandle(podName, namespace, k8s)
     }
@@ -273,16 +276,16 @@ class K8sRuntimeProvider(
         val podName = podNames.remove(instanceId) ?: return
         val k8s = client ?: return
         try {
-            k8s.pods().inNamespace(config.namespace).withName(podName).delete()
-            log("Stopped K8s pod '$podName' for instance $instanceId", LogType.INFORMATION)
+            k8s.pods().inNamespace(config.namespace).withName(podName).withTimeoutInMillis(30.seconds.inWholeMilliseconds).delete()
+            log("Stopped K8s pod '$podName' for instance $instanceId")
         } catch (e: Exception) {
-            log("Failed to stop K8s pod '$podName' for instance $instanceId: ${e.message}", LogType.ERROR)
+            log("Failed to stop K8s pod '$podName' for instance $instanceId: ${e.message}", LogLevel.ERROR)
         }
     }
 
     override fun executeCommand(instanceId: String, command: String) {
         val podName = podNames[instanceId]
-            ?: return log("No K8s pod found for instance $instanceId", LogType.WARNING)
+            ?: return log("No K8s pod found for instance $instanceId", LogLevel.WARNING)
         val k8s = client ?: return
 
         try {
@@ -291,10 +294,10 @@ class K8sRuntimeProvider(
             k8s.pods().inNamespace(config.namespace).withName(podName)
                 .writingOutput(out)
                 .writingError(err)
-                .exec("sh", "-c", command)
-            log("Executed command in K8s pod '$podName' for instance $instanceId: $command", LogType.INFORMATION)
+                .exec(command)
+            log("Executed command in K8s pod '$podName' for instance $instanceId: $command")
         } catch (e: Exception) {
-            log("Failed to execute command in K8s pod '$podName' for instance $instanceId: ${e.message}", LogType.ERROR)
+            log("Failed to execute command in K8s pod '$podName' for instance $instanceId: ${e.message}", LogLevel.ERROR)
         }
     }
 
@@ -382,14 +385,14 @@ class K8sRuntimeProvider(
                 .replace("127.0.0.1", "host.docker.internal")
                 .replace("localhost", "host.docker.internal")
             baseConfig.masterUrl = rewritten
-            log("Running inside Docker. Rewrote K8s API server from $originalMasterUrl to $rewritten", LogType.INFORMATION)
+            log("Running inside Docker. Rewrote K8s API server from $originalMasterUrl to $rewritten")
         }
 
         // Local clusters (minikube, Docker Desktop, kind) use self-signed certs that won't
         // match host.docker.internal after rewrite. Trust all certs for local clusters.
         if (isLocalCluster) {
             baseConfig.isTrustCerts = true
-            log("Local K8s cluster detected. Disabling certificate verification.", LogType.WARNING)
+            log("Local K8s cluster detected. Disabling certificate verification.", LogLevel.WARNING)
         }
 
         // Fail fast: no retries, short connection timeout to avoid retry storm spam
@@ -440,7 +443,7 @@ class K8sRuntimeProvider(
         val s3Config = readS3Config()
         val bucket = config.s3Bucket ?: s3Config?.bucket ?: run {
             log("S3 template init enabled but no S3 bucket configured. " +
-                "Set s3Bucket in K8s config or enable the S3 storage extension.", LogType.WARNING)
+                "Set s3Bucket in K8s config or enable the S3 storage extension.", LogLevel.WARNING)
             return emptyList()
         }
         val prefix = config.s3Prefix ?: s3Config?.prefix ?: "templates/"
@@ -519,7 +522,7 @@ class K8sRuntimeProvider(
             val json = java.nio.file.Files.readString(path)
             Gson().fromJson(json, S3Credentials::class.java)
         } catch (e: Exception) {
-            log("Failed to read S3 config for init container: ${e.message}", LogType.WARNING)
+            log("Failed to read S3 config for init container: ${e.message}", LogLevel.WARNING)
             null
         }
     }
