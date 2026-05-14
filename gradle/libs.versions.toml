@@ -16,11 +16,15 @@ guava = "33.6.0-jre"
 okio = "3.17.0"
 hazelcast = "5.6.0"
 ktor = "3.4.3"
+kotlinx-html = "0.12.0"
 docker-java = "3.7.1"
 aws-sdk = "2.44.4"
 jline = "4.1.0"
 logback = "1.5.32"
 k8s-client = "7.6.1"
+h2 = "2.4.240"
+mariadb = "3.5.8"
+jooq = "3.21.4"
 paper = "1.21.4-R0.1-SNAPSHOT"
 spigot-legacy = "1.8.8-R0.1-SNAPSHOT"
 velocity = "3.5.0-SNAPSHOT"
@@ -62,6 +66,9 @@ ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", versio
 ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor" }
 ktor-server-host-common = { module = "io.ktor:ktor-server-host-common", version.ref = "ktor" }
 ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+ktor-server-openapi = { module = "io.ktor:ktor-server-openapi", version.ref = "ktor" }
+ktor-server-html-builder = { module = "io.ktor:ktor-server-html-builder", version.ref = "ktor" }
+kotlinx-html = { module = "org.jetbrains.kotlinx:kotlinx-html", version.ref = "kotlinx-html" }
 
 # docker-java
 docker-java-core = { module = "com.github.docker-java:docker-java-core", version.ref = "docker-java" }
@@ -77,6 +84,12 @@ logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "lo
 
 # fabric8 kubernetes client
 k8s-client = { module = "io.fabric8:kubernetes-client", version.ref = "k8s-client" }
+
+# database
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+mariadb = { module = "org.mariadb.jdbc:mariadb-java-client", version.ref = "mariadb" }
+jooq = { module = "org.jooq:jooq", version.ref = "jooq" }
+jooq-kotlin = { module = "org.jooq:jooq-kotlin", version.ref = "jooq" }
 
 # cloud minecraft
 cloud-paper = { module = "org.incendo:cloud-paper", version.ref = "cloudMinecraft" }
@@ -99,7 +112,8 @@ ktor = [
     "ktor-server-content-negotiation", "ktor-server-auth",
     "ktor-server-cors", "ktor-server-status-pages",
     "ktor-server-call-logging", "ktor-server-host-common",
-    "ktor-server-websockets"
+    "ktor-server-websockets", "ktor-server-openapi",
+    "ktor-server-html-builder", "kotlinx-html"
 ]
 dockerJava = [
     "docker-java-core", "docker-java-api", "docker-java-transport-httpclient5"

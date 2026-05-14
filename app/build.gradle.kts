@@ -45,6 +45,14 @@ dependencies {
 
     // logback-classic as SLF4J implementation for docker-java / k8s-client / hazelcast logging
     runtimeDownload(libs.logback.classic)
+
+    // database drivers (H2 default, MariaDB for MySQL)
+    runtimeDownload(libs.h2)
+    runtimeDownload(libs.mariadb)
+
+    // jOOQ for type-safe SQL building (with Kotlin extensions)
+    runtimeDownload(libs.jooq)
+    runtimeDownload(libs.jooq.kotlin)
 }
 
 tasks.shadowJar {
