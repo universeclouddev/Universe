@@ -17,5 +17,8 @@ data class UniverseMainConfiguration(
     /** Maximum RAM (in MB) this node is allowed to allocate to instances. */
     val maxRamMB: Int = 8192,
     /** Maximum CPU units this node is allowed to allocate to instances. */
-    val maxCpu: Int = 400
+    val maxCpu: Int = 400,
+
+    /** Auto-update sources for configurations and templates. */
+    val updateSources: List<UpdateSource> = emptyList()
 )
