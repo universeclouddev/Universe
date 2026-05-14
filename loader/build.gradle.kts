@@ -11,7 +11,7 @@ dependencies {
     implementation(libs.dependencyDownload)
     implementation("me.lucko:jar-relocator:1.7")
     implementation("org.ow2.asm:asm:9.9.1")
-    implementation("org.ow2.asm:asm-commons:9.9.1")
+    implementation("org.ow2.asm:asm-commons:9.10")
 
     implementation(kotlin("stdlib"))
     implementation(kotlin("reflect"))
