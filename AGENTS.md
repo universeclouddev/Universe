@@ -51,6 +51,7 @@ This document defines the roles, system boundaries, and handoff protocols for th
 - **Interface exposure:** Registry interfaces (`TemplateStorageRegistry`, `TemplateVariableRegistry`, `TemplateResolver`) must live in `extensions/api` so extensions can inject and use them. Implementations stay in `app`.
 - **KDoc safety:** Never write `/*` (e.g., `group/*`) inside KDoc comments. Use `/(*)` or rephrase to avoid premature comment termination.
 - **Extension naming:** Extensions should be prefixed by their category: `runtime-*` for runtimes, `storage-*` for storage backends, etc.
+- **YouTrack ticket references:** When implementing work related to a YouTrack ticket (e.g., LUNA-1, LUNA-3), the ticket ID **must** be referenced in commit messages. Format: `LUNA-1: <description>` or include the ticket number in the commit body.
 
 ## Dependencies
 - All agents must use Google Guice for Dependency Injection.
