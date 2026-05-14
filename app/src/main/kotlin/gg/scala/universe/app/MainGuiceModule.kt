@@ -16,6 +16,8 @@ import gg.scala.universe.db.DatabaseRegistryImpl
 import gg.scala.universe.db.H2DatabaseProvider
 import gg.scala.universe.db.MySQLDatabaseProvider
 import gg.scala.universe.extension.ExtensionService
+import gg.scala.universe.metrics.MetricsRegistry
+import gg.scala.universe.metrics.MetricsRegistryImpl
 import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.runtime.RuntimeRegistryImpl
 import gg.scala.universe.template.DefaultTemplateVariableProvider
@@ -36,6 +38,7 @@ class MainGuiceModule : AbstractModule() {
         bind(TemplateVariableRegistry::class.java).to(TemplateVariableRegistryImpl::class.java).asEagerSingleton()
         bind(DefaultTemplateVariableProvider::class.java).asEagerSingleton()
         bind(DatabaseRegistry::class.java).to(DatabaseRegistryImpl::class.java).asEagerSingleton()
+        bind(MetricsRegistry::class.java).to(MetricsRegistryImpl::class.java).asEagerSingleton()
         bind(ExecutorService::class.java).toInstance(Executors.newFixedThreadPool(4))
     }
 
