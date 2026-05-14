@@ -7,7 +7,14 @@ import gg.scala.universe.command.CommandProvider
 import gg.scala.universe.command.CommandProviderImpl
 import gg.scala.universe.command.CommandSource
 import gg.scala.universe.command.DefaultCommandManager
+import gg.scala.universe.config.DatabaseConfigLoader
+import gg.scala.universe.config.DatabaseConfiguration
 import gg.scala.universe.config.UniverseMainConfiguration
+import gg.scala.universe.db.DatabaseProvider
+import gg.scala.universe.db.DatabaseRegistry
+import gg.scala.universe.db.DatabaseRegistryImpl
+import gg.scala.universe.db.H2DatabaseProvider
+import gg.scala.universe.db.MySQLDatabaseProvider
 import gg.scala.universe.extension.ExtensionService
 import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.runtime.RuntimeRegistryImpl
@@ -28,7 +35,32 @@ class MainGuiceModule : AbstractModule() {
         bind(TemplateStorageRegistry::class.java).to(TemplateStorageRegistryImpl::class.java).asEagerSingleton()
         bind(TemplateVariableRegistry::class.java).to(TemplateVariableRegistryImpl::class.java).asEagerSingleton()
         bind(DefaultTemplateVariableProvider::class.java).asEagerSingleton()
+        bind(DatabaseRegistry::class.java).to(DatabaseRegistryImpl::class.java).asEagerSingleton()
         bind(ExecutorService::class.java).toInstance(Executors.newFixedThreadPool(4))
+    }
+
+    @Provides
+    fun databaseConfiguration(): DatabaseConfiguration {
+        return DatabaseConfigLoader.load()
+    }
+
+    @Provides
+    fun databaseProvider(
+        config: DatabaseConfiguration,
+        registry: DatabaseRegistry
+    ): DatabaseProvider {
+        // Register built-in providers
+        registry.register("h2", H2DatabaseProvider(config))
+        registry.register("mysql", MySQLDatabaseProvider(config))
+
+        val provider = registry.get(config.provider)
+            ?: throw IllegalStateException(
+                "Unknown database provider '${config.provider}'. " +
+                "Registered: ${registry.getAll().keys}"
+            )
+
+        provider.connect()
+        return provider
     }
 
     @Provides
