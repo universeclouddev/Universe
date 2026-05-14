@@ -4,6 +4,7 @@ import com.google.inject.Guice
 import com.google.inject.Injector
 import com.google.inject.Module
 import com.hazelcast.core.HazelcastInstance
+import gg.scala.universe.console.Ansi
 import gg.scala.universe.console.Console
 import gg.scala.universe.console.log
 import org.slf4j.LoggerFactory
@@ -23,6 +24,7 @@ import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.runtime.ProcessRuntimeProvider
 import gg.scala.universe.runtime.ScreenRuntimeProvider
 import gg.scala.universe.runtime.TmuxRuntimeProvider
+import gg.scala.universe.service.AutoUpdaterService
 import gg.scala.universe.service.InstanceCountEnforcer
 import gg.scala.universe.service.InstanceHealthMonitor
 import gg.scala.universe.service.InstanceRecoveryService
@@ -67,6 +69,10 @@ class UniverseApplication {
         val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
         healthMonitor.start()
 
+        // Start auto-updater for remote configurations and templates
+        val autoUpdater = injector.getInstance(AutoUpdaterService::class.java)
+        autoUpdater.start()
+
         if (mainConfiguration.isMasterNode) {
             val clusterStateService = injector.getInstance(ClusterStateService::class.java)
             hzService.hzInstance.cluster.addMembershipListener(
@@ -95,35 +101,30 @@ class UniverseApplication {
                 commandBootstrap.stop()
 
                 // Use println directly to bypass JLine entirely during shutdown
-                println("  \u001B[34m\u2192\u001B[0m Shutting down Universe...")
+                println("  ${Ansi.BLUE}→${Ansi.RESET} Shutting down Universe...")
 
                 // Stop background services first so they don't race with Hazelcast
-                println("  \u001B[34m\u2192\u001B[0m Stopping background services...")
+                println("  ${Ansi.BLUE}→${Ansi.RESET} Stopping background services...")
                 val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
                 healthMonitor.stop()
-
-                if (mainConfiguration.isMasterNode) {
-                    val enforcer = injector.getInstance(InstanceCountEnforcer::class.java)
-                    enforcer.stop()
-                    val ktorService = injector.getInstance(KtorServerService::class.java)
-                    ktorService.stop()
-                }
+                val autoUpdater = injector.getInstance(AutoUpdaterService::class.java)
+                autoUpdater.stop()
 
                 // Stop local instances (needs Hazelcast)
-                println("  \u001B[34m\u2192\u001B[0m Stopping local instances...")
+                println("  ${Ansi.BLUE}→${Ansi.RESET} Stopping local instances...")
                 val nodeShutdownService = injector.getInstance(NodeShutdownService::class.java)
                 nodeShutdownService.stopAllLocalInstances()
 
                 // Shutdown Hazelcast last
-                println("  \u001B[34m\u2192\u001B[0m Shutting down Hazelcast cluster...")
+                println("  ${Ansi.BLUE}→${Ansi.RESET} Shutting down Hazelcast cluster...")
                 try {
                     hzService.hzInstance.shutdown()
                 } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
                     // Already shut down
                 }
-                println("  \u001B[32m\u2713\u001B[0m Universe shutdown complete")
+                println("  ${Ansi.GREEN}✓${Ansi.RESET} Universe shutdown complete")
             } catch (e: Exception) {
-                println("  \u001B[31m\u2717\u001B[0m Error during shutdown: ${e.message}")
+                println("  ${Ansi.RED}✗${Ansi.RESET} Error during shutdown: ${e.message}")
                 e.printStackTrace()
             }
         }, "universe-shutdown"))
