@@ -28,6 +28,7 @@ postgres = "42.7.11"
 mongodb = "5.7.0"
 jedis = "7.5.0"
 jooq = "3.21.4"
+jgit = "7.6.0.202603022253-r"
 micrometer = "1.16.0"
 micrometer-influx = "1.16.0"
 influxdb = "8.0.0"
@@ -99,6 +100,7 @@ mongodb-driver = { module = "org.mongodb:mongodb-driver-sync", version.ref = "mo
 jedis = { module = "redis.clients:jedis", version.ref = "jedis" }
 jooq = { module = "org.jooq:jooq", version.ref = "jooq" }
 jooq-kotlin = { module = "org.jooq:jooq-kotlin", version.ref = "jooq" }
+jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "jgit" }
 
 # metrics
 micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
