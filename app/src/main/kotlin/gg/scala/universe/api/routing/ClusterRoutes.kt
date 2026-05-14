@@ -10,6 +10,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.auth.authenticate
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
@@ -21,6 +22,7 @@ fun Application.configureClusterRoutes(
     taskDispatcher: TaskDispatcher
 ) {
     routing {
+        authenticate("protected") {
         route("/api/cluster") {
             get("/nodes") {
                 val nodes = hazelcastInstance.cluster.members.map { member ->
@@ -86,6 +88,7 @@ fun Application.configureClusterRoutes(
                 // TODO: Implement remote command dispatch via Hazelcast executor
                 call.respond(HttpStatusCode.NotImplemented, mapOf("error" to "Remote console command execution is not yet implemented"))
             }
+        }
         }
     }
 }

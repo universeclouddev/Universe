@@ -11,6 +11,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
 import io.ktor.server.response.respond
+import io.ktor.server.auth.authenticate
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
@@ -30,6 +31,7 @@ fun Application.configureNodeRoutes(
 ) {
     routing {
         route("/api") {
+            // Public health check — no auth required
             get("/ping") {
                 call.respond(HttpStatusCode.OK, mapOf(
                     "status" to "ok",
@@ -39,57 +41,59 @@ fun Application.configureNodeRoutes(
                 ))
             }
 
-            get("/node") {
-                val runtime = Runtime.getRuntime()
-                val osBean = ManagementFactory.getOperatingSystemMXBean()
-                val uptime = ManagementFactory.getRuntimeMXBean().uptime
+            authenticate("protected") {
+                get("/node") {
+                    val runtime = Runtime.getRuntime()
+                    val osBean = ManagementFactory.getOperatingSystemMXBean()
+                    val uptime = ManagementFactory.getRuntimeMXBean().uptime
 
-                call.respond(HttpStatusCode.OK, mapOf(
-                    "id" to config.nodeId,
-                    "clusterName" to config.clusterName,
-                    "version" to "0.0.1",
-                    "master" to config.isMasterNode,
-                    "address" to config.address,
-                    "port" to config.port,
-                    "apiPort" to config.apiPort,
-                    "uptimeMs" to uptime,
-                    "system" to mapOf(
-                        "availableProcessors" to osBean.availableProcessors,
-                        "systemLoadAverage" to osBean.systemLoadAverage,
-                        "freeMemory" to runtime.freeMemory(),
-                        "totalMemory" to runtime.totalMemory(),
-                        "maxMemory" to runtime.maxMemory()
-                    )
-                ))
-            }
-
-            get("/node/config") {
-                call.respond(HttpStatusCode.OK, config)
-            }
-
-            post("/node/reload") {
-                // TODO: Trigger configuration reload
-                call.respond(HttpStatusCode.NotImplemented, mapOf("error" to "Configuration reload is not yet implemented"))
-            }
-
-            webSocket("/console") {
-                if (!config.isMasterNode) {
-                    outgoing.send(Frame.Text("Console websocket is only available on the master node"))
-                    close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Not master node"))
-                    return@webSocket
+                    call.respond(HttpStatusCode.OK, mapOf(
+                        "id" to config.nodeId,
+                        "clusterName" to config.clusterName,
+                        "version" to "0.0.1",
+                        "master" to config.isMasterNode,
+                        "address" to config.address,
+                        "port" to config.port,
+                        "apiPort" to config.apiPort,
+                        "uptimeMs" to uptime,
+                        "system" to mapOf(
+                            "availableProcessors" to osBean.availableProcessors,
+                            "systemLoadAverage" to osBean.systemLoadAverage,
+                            "freeMemory" to runtime.freeMemory(),
+                            "totalMemory" to runtime.totalMemory(),
+                            "maxMemory" to runtime.maxMemory()
+                        )
+                    ))
                 }
 
-                val output = WebSocketConsoleOutput(outgoing)
-                try {
-                    for (frame in incoming) {
-                        if (frame is Frame.Text) {
-                            val command = frame.readText()
-                            val source = WebSocketCommandSource(output)
-                            commandProvider.execute(source, command)
-                        }
+                get("/node/config") {
+                    call.respond(HttpStatusCode.OK, config)
+                }
+
+                post("/node/reload") {
+                    // TODO: Trigger configuration reload
+                    call.respond(HttpStatusCode.NotImplemented, mapOf("error" to "Configuration reload is not yet implemented"))
+                }
+
+                webSocket("/console") {
+                    if (!config.isMasterNode) {
+                        outgoing.send(Frame.Text("Console websocket is only available on the master node"))
+                        close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Not master node"))
+                        return@webSocket
                     }
-                } catch (_: Exception) {
-                    // Client disconnected
+
+                    val output = WebSocketConsoleOutput(outgoing)
+                    try {
+                        for (frame in incoming) {
+                            if (frame is Frame.Text) {
+                                val command = frame.readText()
+                                val source = WebSocketCommandSource(output)
+                                commandProvider.execute(source, command)
+                            }
+                        }
+                    } catch (_: Exception) {
+                        // Client disconnected
+                    }
                 }
             }
         }

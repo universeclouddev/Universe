@@ -3,6 +3,7 @@ package gg.scala.universe.api
 import com.google.inject.Inject
 import com.hazelcast.core.HazelcastInstance
 import gg.scala.universe.api.plugins.configureCors
+import gg.scala.universe.api.plugins.configureDocumentation
 import gg.scala.universe.api.plugins.configureExceptionCatcher
 import gg.scala.universe.api.plugins.configureLoggingMessages
 import gg.scala.universe.api.plugins.configureSecurity
@@ -15,6 +16,7 @@ import gg.scala.universe.api.routing.configureTemplateRoutes
 import gg.scala.universe.command.CommandProvider
 import gg.scala.universe.config.UniverseMainConfiguration
 import gg.scala.universe.console.log
+import gg.scala.universe.db.DatabaseProvider
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.task.TaskDispatcher
 import gg.scala.universe.service.InstanceCreationService
@@ -42,7 +44,8 @@ class KtorServerService @Inject constructor(
     private val commandProvider: CommandProvider,
     private val instanceCreationService: InstanceCreationService,
     private val templateManager: TemplateManager,
-    private val templateSyncService: TemplateSyncService
+    private val templateSyncService: TemplateSyncService,
+    private val databaseProvider: DatabaseProvider
 ) {
     private var server: io.ktor.server.engine.EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -72,7 +75,8 @@ class KtorServerService @Inject constructor(
                     commandProvider,
                     instanceCreationService,
                     templateManager,
-                    templateSyncService
+                    templateSyncService,
+                    databaseProvider
                 )
             }
         ).start(wait = false)
@@ -94,7 +98,8 @@ private fun Application.configureServerModule(
     commandProvider: CommandProvider,
     instanceCreationService: InstanceCreationService,
     templateManager: TemplateManager,
-    templateSyncService: TemplateSyncService
+    templateSyncService: TemplateSyncService,
+    databaseProvider: DatabaseProvider
 ) {
     install(WebSockets) {
         pingPeriod = 15.seconds
@@ -104,10 +109,11 @@ private fun Application.configureServerModule(
     }
 
     configureCors()
-    configureSecurity()
+    configureSecurity(databaseProvider)
     configureLoggingMessages()
     configureSerialization()
     configureExceptionCatcher()
+    configureDocumentation()
 
     configureCommandRoutes(commandProvider)
     configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, instanceCreationService)

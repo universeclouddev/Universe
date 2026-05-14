@@ -7,26 +7,29 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.auth.authenticate
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 
 fun Application.configureCommandRoutes(commandProvider: CommandProvider) {
     routing {
-        route("/api/commands/execute") {
-            post {
-                val request = call.receive<ExecuteCommandRequest>()
-                val command = request.command
+        authenticate("protected") {
+            route("/api/commands/execute") {
+                post {
+                    val request = call.receive<ExecuteCommandRequest>()
+                    val command = request.command
 
-                val output = mutableListOf<String>()
-                val capturingSource = CapturingCommandSource(output)
+                    val output = mutableListOf<String>()
+                    val capturingSource = CapturingCommandSource(output)
 
-                commandProvider.execute(capturingSource, command)
+                    commandProvider.execute(capturingSource, command)
 
-                call.respond(HttpStatusCode.OK, mapOf(
-                    "command" to command,
-                    "output" to output
-                ))
+                    call.respond(HttpStatusCode.OK, mapOf(
+                        "command" to command,
+                        "output" to output
+                    ))
+                }
             }
         }
     }
