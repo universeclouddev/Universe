@@ -49,14 +49,17 @@ class MainGuiceModule : AbstractModule() {
         config: DatabaseConfiguration,
         registry: DatabaseRegistry
     ): DatabaseProvider {
-        // Register built-in providers
-        registry.register("h2", H2DatabaseProvider(config))
-        registry.register("mysql", MySQLDatabaseProvider(config))
+        // Register built-in providers only if selected
+        when (config.provider) {
+            "h2" -> registry.register("h2", H2DatabaseProvider(config))
+            "mysql" -> registry.register("mysql", MySQLDatabaseProvider(config))
+        }
 
         val provider = registry.get(config.provider)
             ?: throw IllegalStateException(
                 "Unknown database provider '${config.provider}'. " +
-                "Registered: ${registry.getAll().keys}"
+                "Built-in: h2, mysql. Extensions: postgres, mongodb, redis. " +
+                "Make sure the corresponding extension JAR is present."
             )
 
         provider.connect()
