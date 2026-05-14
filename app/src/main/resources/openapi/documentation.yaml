@@ -1,0 +1,282 @@
+openapi: 3.0.3
+info:
+  title: Universe API
+  description: REST API for the Universe orchestrator.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api
+    description: Local development server
+paths:
+  /ping:
+    get:
+      summary: Health check
+      operationId: ping
+      responses:
+        '200':
+          description: Universe is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /node:
+    get:
+      summary: Get current node information
+      operationId: getNode
+      responses:
+        '200':
+          description: Node details
+  /node/config:
+    get:
+      summary: Get current node configuration
+      operationId: getNodeConfig
+      responses:
+        '200':
+          description: Node configuration
+  /node/reload:
+    post:
+      summary: Reload node configuration
+      operationId: reloadNodeConfig
+      responses:
+        '200':
+          description: Configuration reloaded
+  /cluster/nodes:
+    get:
+      summary: List all cluster nodes
+      operationId: listNodes
+      responses:
+        '200':
+          description: List of nodes
+  /cluster/nodes/{id}:
+    get:
+      summary: Get a specific node
+      operationId: getNodeById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Node details
+    post:
+      summary: Execute a command on a node
+      operationId: executeNodeCommand
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                command:
+                  type: string
+      responses:
+        '200':
+          description: Command output
+  /instances:
+    get:
+      summary: List all instances
+      operationId: listInstances
+      responses:
+        '200':
+          description: List of instances
+  /instances/{id}:
+    get:
+      summary: Get instance details
+      operationId: getInstance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Instance details
+    delete:
+      summary: Delete an instance
+      operationId: deleteInstance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Instance deleted
+  /instances/{id}/logs:
+    get:
+      summary: Get instance logs
+      operationId: getInstanceLogs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lines
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Log lines
+  /instances/{id}/lifecycle:
+    patch:
+      summary: Change instance lifecycle state
+      operationId: patchInstanceLifecycle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: target
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [start, stop, restart]
+      responses:
+        '200':
+          description: Lifecycle changed
+  /instances/{id}/execute:
+    post:
+      summary: Execute a command in an instance
+      operationId: executeInstanceCommand
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                command:
+                  type: string
+      responses:
+        '200':
+          description: Command executed
+  /configurations:
+    get:
+      summary: List all configurations
+      operationId: listConfigurations
+      responses:
+        '200':
+          description: List of configurations
+  /configurations/{name}:
+    get:
+      summary: Get a configuration
+      operationId: getConfiguration
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Configuration details
+    put:
+      summary: Create or update a configuration
+      operationId: putConfiguration
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Configuration saved
+    delete:
+      summary: Delete a configuration
+      operationId: deleteConfiguration
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Configuration deleted
+  /templates:
+    get:
+      summary: List all templates
+      operationId: listTemplates
+      responses:
+        '200':
+          description: List of templates
+  /templates/{group}/{name}:
+    get:
+      summary: Get template details
+      operationId: getTemplate
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Template details
+  /templates/sync:
+    post:
+      summary: Sync templates across cluster
+      operationId: syncTemplates
+      responses:
+        '200':
+          description: Sync initiated
+  /commands/execute:
+    post:
+      summary: Execute a console command
+      operationId: executeCommand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                command:
+                  type: string
+      responses:
+        '200':
+          description: Command output
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+security:
+  - bearerAuth: []
