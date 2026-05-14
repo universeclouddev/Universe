@@ -7,6 +7,8 @@ import gg.scala.universe.command.CommandProvider
 import gg.scala.universe.command.CommandProviderImpl
 import gg.scala.universe.command.CommandSource
 import gg.scala.universe.command.DefaultCommandManager
+import gg.scala.universe.cluster.ClusterDataProvider
+import gg.scala.universe.cluster.ClusterDataProviderImpl
 import gg.scala.universe.config.DatabaseConfigLoader
 import gg.scala.universe.config.DatabaseConfiguration
 import gg.scala.universe.config.UniverseMainConfiguration
@@ -39,6 +41,7 @@ class MainGuiceModule : AbstractModule() {
         bind(DefaultTemplateVariableProvider::class.java).asEagerSingleton()
         bind(DatabaseRegistry::class.java).to(DatabaseRegistryImpl::class.java).asEagerSingleton()
         bind(MetricsRegistry::class.java).to(MetricsRegistryImpl::class.java).asEagerSingleton()
+        bind(ClusterDataProvider::class.java).to(ClusterDataProviderImpl::class.java).asEagerSingleton()
         bind(ExecutorService::class.java).toInstance(Executors.newFixedThreadPool(4))
     }
 
