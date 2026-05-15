@@ -1,0 +1,9 @@
+{
+  "token": "YOUR_BOT_TOKEN_HERE",
+  "guild-id": "",
+  "status-channel-id": "",
+  "log-channel-id": "",
+  "embed-color": 5814783,
+  "allowed-role-ids": [],
+  "intents": ["MESSAGE_CONTENT", "GUILD_MESSAGES", "GUILD_MEMBERS"]
+}
