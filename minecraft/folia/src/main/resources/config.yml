@@ -1,0 +1,4 @@
+# Universe Master REST API URL
+master-url: "http://localhost:6000"
+# instance-id: ""
+heartbeat-interval-seconds: 30
