@@ -1,0 +1,4 @@
+name: Universe
+version: ${version}
+main: gg.scala.universe.minecraft.bungee.UniverseBungeePlugin
+author: Scala Universe
