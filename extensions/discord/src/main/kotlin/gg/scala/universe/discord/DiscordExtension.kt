@@ -13,6 +13,9 @@ import net.dv8tion.jda.api.entities.Activity
 import net.dv8tion.jda.api.requests.GatewayIntent
 import net.dv8tion.jda.api.utils.ChunkingFilter
 import net.dv8tion.jda.api.utils.MemberCachePolicy
+import org.incendo.cloud.discord.jda6.JDA6CommandManager
+import org.incendo.cloud.discord.jda6.JDAInteraction
+import org.incendo.cloud.execution.ExecutionCoordinator
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -25,6 +28,7 @@ class DiscordExtension : Extension {
 
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
     private var jda: JDA? = null
+    private var commandManager: JDA6CommandManager<JDAInteraction>? = null
     private var scheduler: ScheduledExecutorService? = null
     private var config: DiscordConfig? = null
 
@@ -41,12 +45,26 @@ class DiscordExtension : Extension {
 
         scheduler = Executors.newScheduledThreadPool(2)
 
+        // Create Cloud JDA6 command manager
+        val cmdManager = JDA6CommandManager(
+            ExecutionCoordinator.asyncCoordinator(),
+            JDAInteraction.InteractionMapper.identity()
+        )
+        commandManager = cmdManager
+
+        // Parse annotated commands
+        val annotationParser = org.incendo.cloud.annotations.AnnotationParser(
+            cmdManager,
+            JDAInteraction::class.java
+        )
+        annotationParser.parse(DiscordCommands(this))
+
         val intents = parseIntents(config!!.intents)
         jda = JDABuilder.createDefault(config!!.token, intents)
             .setActivity(Activity.watching("Universe Cluster"))
             .setChunkingFilter(ChunkingFilter.ALL)
             .setMemberCachePolicy(MemberCachePolicy.ALL)
-            .addEventListeners(DiscordCommandHandler(this))
+            .addEventListeners(commandManager!!.createListener())
             .build()
 
         log("Discord extension loaded! Bot is online.", LogLevel.SUCCESS)
@@ -58,6 +76,7 @@ class DiscordExtension : Extension {
         scheduler?.shutdown()
         scheduler?.awaitTermination(5, TimeUnit.SECONDS)
         jda = null
+        commandManager = null
         scheduler = null
         log("Discord extension unloaded.", LogLevel.SUCCESS)
     }
@@ -70,13 +89,13 @@ class DiscordExtension : Extension {
 
     fun getConfig(): DiscordConfig? = config
     fun getJDA(): JDA? = jda
+    fun getCommandManager(): JDA6CommandManager<JDAInteraction>? = commandManager
     fun getScheduler(): ScheduledExecutorService? = scheduler
     fun getClusterDataProvider(): ClusterDataProvider? = clusterDataProvider
 
     private fun loadConfig(): DiscordConfig {
         val configFile = File("extensions/discord/config.json")
         if (!configFile.exists()) {
-            // Create default config from resources
             val defaultConfig = javaClass.getResourceAsStream("/config.json")?.bufferedReader()?.use { it.readText() }
                 ?: defaultConfigJson()
             configFile.parentFile.mkdirs()

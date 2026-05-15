@@ -38,7 +38,7 @@ velocity = "3.5.0-SNAPSHOT"
 folia = "1.21.8-R0.1-SNAPSHOT"
 bungeecord = "1.21-R0.1-SNAPSHOT"
 jda = "6.4.1"
-cloudDiscord = "2.0.0-beta.15"
+cloudDiscord = "1.0.0-beta.4"
 
 [libraries]
 # dependency download
@@ -116,7 +116,8 @@ influxdb-client = { module = "com.influxdb:influxdb-client-java", version.ref = 
 cloud-paper = { module = "org.incendo:cloud-paper", version.ref = "cloudMinecraft" }
 cloud-bukkit = { module = "org.incendo:cloud-bukkit", version.ref = "cloudMinecraft" }
 cloud-velocity = { module = "org.incendo:cloud-velocity", version.ref = "cloudMinecraft" }
-cloud-bungee = { module = "org.incendo:cloud-bungee", version.ref = "cloudDiscord" }
+cloud-bungee = { module = "org.incendo:cloud-bungee", version.ref = "cloudMinecraft" }
+cloud-jda6 = { module = "org.incendo:cloud-jda6", version.ref = "cloudDiscord" }
 
 # minecraft
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper" }

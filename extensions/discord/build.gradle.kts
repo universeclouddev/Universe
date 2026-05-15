@@ -5,9 +5,9 @@ dependencies {
     // JDA for Discord bot
     implementation(libs.jda)
 
-    // Cloud commands for Discord
+    // Cloud JDA6 commands
+    implementation(libs.cloud.jda6)
     implementation(libs.cloudAnnotations)
-    implementation(libs.cloudCoreApi)
 
     // Shade Gson (relocated)
     implementation(libs.gson)

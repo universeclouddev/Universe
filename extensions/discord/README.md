@@ -79,6 +79,7 @@ If `allowed-role-ids` is empty, all users can use commands.
 ## Architecture
 
 - Uses **JDA 6.4.1** for Discord API interaction
-- All JDA dependencies are relocated to `gg.scala.universe.libs.*` to avoid conflicts
+- Uses **Cloud JDA6** (`cloud-jda6`) for annotated slash command handling
+- All JDA and Cloud dependencies are relocated to `gg.scala.universe.libs.*` to avoid conflicts
 - Injects `ClusterDataProvider` via Guice for extension-safe cluster state access
-- Slash commands only (no prefix/text commands)
+- Commands defined with Cloud `@Command` annotations on `DiscordCommands` class
