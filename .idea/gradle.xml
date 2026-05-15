@@ -25,7 +25,14 @@
             <option value="$PROJECT_DIR$/buildSrc" />
             <option value="$PROJECT_DIR$/extensions" />
             <option value="$PROJECT_DIR$/extensions/api" />
+            <option value="$PROJECT_DIR$/extensions/argocd" />
+            <option value="$PROJECT_DIR$/extensions/db-mongodb" />
+            <option value="$PROJECT_DIR$/extensions/db-postgres" />
+            <option value="$PROJECT_DIR$/extensions/db-redis" />
             <option value="$PROJECT_DIR$/extensions/example" />
+            <option value="$PROJECT_DIR$/extensions/gitops" />
+            <option value="$PROJECT_DIR$/extensions/metrics-influxdb" />
+            <option value="$PROJECT_DIR$/extensions/metrics-prometheus" />
             <option value="$PROJECT_DIR$/extensions/runtime-docker" />
             <option value="$PROJECT_DIR$/extensions/runtime-k8s" />
             <option value="$PROJECT_DIR$/extensions/storage-s3" />
