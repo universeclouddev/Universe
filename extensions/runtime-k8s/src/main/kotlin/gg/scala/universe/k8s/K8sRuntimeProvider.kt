@@ -83,7 +83,7 @@ class K8sRuntimeProvider(
 
         val containerBuilder = ContainerBuilder()
             .withName("main")
-            .withImage(config.image)
+            .withImage(resolveImage(config.image, environmentVariables))
             .withImagePullPolicy(config.imagePullPolicy)
             .withCommand("sh", "-c", command)
             .withWorkingDir(config.workingDir)
@@ -324,6 +324,16 @@ class K8sRuntimeProvider(
         } catch (_: Exception) {
             emptyList()
         }
+    }
+
+    /**
+     * Resolves the container image to use. If `CUSTOM_IMAGE` is present in
+     * the environment variables, it overrides the configured image.
+     */
+    private fun resolveImage(default: String, envVars: Map<String, String>?): String {
+        val customImage = envVars?.get("CUSTOM_IMAGE") ?: return default
+        log("CUSTOM_IMAGE override detected: '$customImage'")
+        return customImage
     }
 
     private fun removePodIfExists(k8s: KubernetesClient, namespace: String, name: String) {

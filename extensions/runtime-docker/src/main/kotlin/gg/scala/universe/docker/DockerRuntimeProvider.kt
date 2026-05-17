@@ -49,7 +49,7 @@ class DockerRuntimeProvider(
         // Ensure no stale container with this name exists
         removeContainerIfExists(containerName)
 
-        val imageRef = buildImageRef(config.javaImage)
+        val imageRef = buildImageRef(resolveImage(config.javaImage, environmentVariables))
 
         // Ensure image is available locally — pull if missing
         ensureImageAvailable(imageRef)
@@ -219,6 +219,31 @@ class DockerRuntimeProvider(
         } catch (_: Exception) {
             emptyList()
         }
+    }
+
+    private fun resolveImage(default: DockerImageConfig, envVars: Map<String, String>?): DockerImageConfig {
+        val customImage = envVars?.get("CUSTOM_IMAGE") ?: return default
+        log("CUSTOM_IMAGE override detected: '$customImage'")
+        // Parse the custom image string into a DockerImageConfig
+        val parts = customImage.split("/")
+        val (registry, repoWithTag) = if (parts.size >= 3 && parts[0].contains(".")) {
+            // Has registry: registry.example.com/org/image:tag
+            parts[0] to parts.drop(1).joinToString("/")
+        } else {
+            // No registry: org/image:tag or just image:tag
+            null to parts.joinToString("/")
+        }
+        val (repo, tag) = if (repoWithTag.contains(":")) {
+            val idx = repoWithTag.indexOf(":")
+            repoWithTag.substring(0, idx) to repoWithTag.substring(idx + 1)
+        } else {
+            repoWithTag to "latest"
+        }
+        return DockerImageConfig(
+            repository = repo,
+            tag = tag,
+            registry = registry
+        )
     }
 
     private fun buildImageRef(image: DockerImageConfig): String {
