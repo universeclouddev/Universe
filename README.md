@@ -292,6 +292,8 @@ When an instance is created, `TemplateManager`:
    - `%NODE_ID%` — local node ID
    - `%HOST_ADDRESS%` — local host address
    - `%CONFIGURATION_NAME%` — configuration name
+5. Replaces custom variables from `Configuration.properties`:
+   - Each entry `{ "myKey": "myValue" }` becomes `%myKey%` → `myValue`
 
 **Template sync between nodes:**
 ```bash

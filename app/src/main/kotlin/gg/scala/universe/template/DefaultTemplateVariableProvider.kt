@@ -21,7 +21,7 @@ class DefaultTemplateVariableProvider @Inject constructor(
     }
 
     override fun provideVariables(configuration: Configuration, instanceId: String, allocatedPort: Int): Map<String, String> {
-        return mapOf(
+        val result = mutableMapOf(
             "%PORT%" to allocatedPort.toString(),
             "%INSTANCE_ID%" to instanceId,
             "%MASTER_IP%" to mainConfiguration.masterAddress,
@@ -32,5 +32,8 @@ class DefaultTemplateVariableProvider @Inject constructor(
             "%HOST_ADDRESS%" to configuration.hostAddress,
             "%CONFIGURATION_NAME%" to configuration.name,
         )
+
+        configuration.properties.forEach { (key, value) -> result["%$key%"] = value }
+        return result
     }
 }

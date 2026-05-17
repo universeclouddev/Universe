@@ -70,3 +70,20 @@ Now when Universe creates a container and bind-mounts the working directory, the
 ### Security Note
 
 Mounting `/var/run/docker.sock` grants the Universe container full control over the host's Docker daemon. Only do this in trusted environments.
+
+### Per-Instance Image Override
+
+You can override the Docker image for a specific instance by setting the `CUSTOM_IMAGE` environment variable in the configuration's `environmentVariables`:
+
+```json
+{
+  "name": "my-server",
+  "runtime": "docker",
+  "environmentVariables": {
+    "CUSTOM_IMAGE": "myregistry.com/custom-java:21",
+    "UNIVERSE_INSTANCE_ID": "%INSTANCE_ID%"
+  }
+}
+```
+
+The `CUSTOM_IMAGE` value is parsed as a full image reference (supports `registry/org/image:tag` format). When present, it takes precedence over the `javaImage` configured in `./extensions/docker/config.json`.

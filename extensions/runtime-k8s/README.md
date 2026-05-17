@@ -43,3 +43,20 @@ For cloud mode, see [CLOUD.md](CLOUD.md) for one-command deployment with S3 temp
 5. The K8s extension **auto-generates init containers** that download templates before the main container starts
 
 Zero manual init container scripting required.
+
+## Per-Instance Image Override
+
+You can override the container image for a specific instance by setting the `CUSTOM_IMAGE` environment variable in the configuration's `environmentVariables`:
+
+```json
+{
+  "name": "my-server",
+  "runtime": "kube",
+  "environmentVariables": {
+    "CUSTOM_IMAGE": "myregistry.com/custom-java:21",
+    "UNIVERSE_INSTANCE_ID": "%INSTANCE_ID%"
+  }
+}
+```
+
+When present, `CUSTOM_IMAGE` takes precedence over the `image` configured in `./extensions/k8s/config.json`.
