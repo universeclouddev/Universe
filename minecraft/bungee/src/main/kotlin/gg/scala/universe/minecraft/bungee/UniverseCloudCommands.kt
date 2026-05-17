@@ -1,5 +1,6 @@
 package gg.scala.universe.minecraft.bungee
 
+import gg.scala.universe.minecraft.api.UniverseAPI
 import net.md_5.bungee.api.ChatColor
 import net.md_5.bungee.api.ProxyServer
 import net.md_5.bungee.api.CommandSender
@@ -10,7 +11,7 @@ import org.incendo.cloud.annotations.Permission
 
 class UniverseCloudCommands(
     private val proxy: ProxyServer,
-    private val api: UniverseBungeePlugin
+    private val api: UniverseAPI
 ) {
 
     @Command("universe")

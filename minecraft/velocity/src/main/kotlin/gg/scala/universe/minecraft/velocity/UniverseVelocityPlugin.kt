@@ -8,7 +8,6 @@ import com.velocitypowered.api.plugin.Plugin
 import com.velocitypowered.api.plugin.annotation.DataDirectory
 import com.velocitypowered.api.proxy.ProxyServer
 import gg.scala.universe.minecraft.api.Universe
-import gg.scala.universe.minecraft.api.UniverseAPI
 import org.incendo.cloud.SenderMapper
 import org.incendo.cloud.annotations.AnnotationParser
 import org.incendo.cloud.execution.ExecutionCoordinator
@@ -27,20 +26,11 @@ class UniverseVelocityPlugin @Inject constructor(
     private val proxy: ProxyServer,
     private val logger: Logger,
     @DataDirectory private val dataDirectory: Path
-) : UniverseAPI {
+) {
 
-    private lateinit var apiImpl: VelocityUniverseAPIImpl
+    private lateinit var api: VelocityUniverseAPIImpl
     private lateinit var serverRegistry: ServerRegistry
     private lateinit var poller: InstancePoller
-
-    // ---- UniverseAPI implementation ----
-
-    override fun getMasterUrl(): String = apiImpl.getMasterUrl()
-    override fun getInstanceId(): String? = apiImpl.getInstanceId()
-    override fun isConnected(): Boolean = apiImpl.isConnected()
-    override fun getInstanceManager() = apiImpl.getInstanceManager()
-    override fun getConfigurationManager() = apiImpl.getConfigurationManager()
-    override fun getTemplateManager() = apiImpl.getTemplateManager()
 
     // ---- Lifecycle ----
 
@@ -48,11 +38,12 @@ class UniverseVelocityPlugin @Inject constructor(
     fun onProxyInitialization(event: ProxyInitializeEvent) {
         val config = loadConfig()
         val masterUrl = config.masterUrl
+        val apiKey = config.apiKey
         val pollInterval = config.pollIntervalSeconds
 
-        apiImpl = VelocityUniverseAPIImpl(masterUrl, null, logger)
+        api = VelocityUniverseAPIImpl(masterUrl, null, apiKey, logger)
         serverRegistry = ServerRegistry(proxy, logger)
-        poller = InstancePoller(masterUrl, serverRegistry, logger)
+        poller = InstancePoller(masterUrl, apiKey, serverRegistry, logger)
 
         // Start polling
         poller.start(pollInterval)
@@ -70,10 +61,10 @@ class UniverseVelocityPlugin @Inject constructor(
             commandManager,
             com.velocitypowered.api.command.CommandSource::class.java
         )
-        annotationParser.parse(UniverseCloudCommands(proxy, this))
+        annotationParser.parse(UniverseCloudCommands(proxy, api))
 
         // Register API
-        Universe.register(this)
+        Universe.register(api)
 
         logger.info("Universe Velocity plugin enabled. Polling $masterUrl every ${pollInterval}s")
     }
@@ -97,6 +88,7 @@ class UniverseVelocityPlugin @Inject constructor(
                 # Universe Velocity Plugin Configuration
                 master-url = "http://localhost:6000"
                 poll-interval-seconds = 10
+                # api-key = ""
                 """.trimIndent()
             )
         }
@@ -105,6 +97,8 @@ class UniverseVelocityPlugin @Inject constructor(
         var masterUrl = System.getProperty("universe.master.url")
             ?: System.getenv("UNIVERSE_MASTER_URL")
             ?: "http://localhost:6000"
+        var apiKey = System.getProperty("universe.api.key")
+            ?: System.getenv("UNIVERSE_API_KEY")
         var pollInterval = 10L
 
         for (line in lines) {
@@ -115,10 +109,16 @@ class UniverseVelocityPlugin @Inject constructor(
             if (trimmed.startsWith("poll-interval-seconds")) {
                 pollInterval = trimmed.substringAfter("=").trim().toLongOrNull() ?: 10L
             }
+            if (trimmed.startsWith("api-key")) {
+                val key = trimmed.substringAfter("=").trim().trim('"')
+                if (key.isNotBlank()) {
+                    apiKey = key
+                }
+            }
         }
 
-        return VelocityConfig(masterUrl, pollInterval)
+        return VelocityConfig(masterUrl, apiKey, pollInterval)
     }
 
-    data class VelocityConfig(val masterUrl: String, val pollIntervalSeconds: Long)
+    data class VelocityConfig(val masterUrl: String, val apiKey: String?, val pollIntervalSeconds: Long)
 }

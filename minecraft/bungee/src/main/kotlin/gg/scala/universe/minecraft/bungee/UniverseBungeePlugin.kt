@@ -12,32 +12,24 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
-class UniverseBungeePlugin : Plugin(), UniverseAPI {
+class UniverseBungeePlugin : Plugin() {
 
-    private lateinit var apiImpl: BungeeUniverseAPIImpl
+    private lateinit var api: BungeeUniverseAPIImpl
     private lateinit var serverRegistry: BungeeServerRegistry
     private lateinit var poller: BungeeInstancePoller
     private lateinit var scheduler: ScheduledExecutorService
-
-    // ---- UniverseAPI implementation ----
-
-    override fun getMasterUrl(): String = apiImpl.getMasterUrl()
-    override fun getInstanceId(): String? = apiImpl.getInstanceId()
-    override fun isConnected(): Boolean = apiImpl.isConnected()
-    override fun getInstanceManager() = apiImpl.getInstanceManager()
-    override fun getConfigurationManager() = apiImpl.getConfigurationManager()
-    override fun getTemplateManager() = apiImpl.getTemplateManager()
 
     // ---- Lifecycle ----
 
     override fun onEnable() {
         val config = loadConfig()
         val masterUrl = config.masterUrl
+        val apiKey = config.apiKey
         val pollInterval = config.pollIntervalSeconds
 
-        apiImpl = BungeeUniverseAPIImpl(masterUrl, null, logger)
+        api = BungeeUniverseAPIImpl(masterUrl, null, apiKey, logger)
         serverRegistry = BungeeServerRegistry(logger)
-        poller = BungeeInstancePoller(masterUrl, serverRegistry, logger)
+        poller = BungeeInstancePoller(masterUrl, apiKey, serverRegistry, logger)
 
         // Start polling
         scheduler = Executors.newSingleThreadScheduledExecutor()
@@ -54,10 +46,10 @@ class UniverseBungeePlugin : Plugin(), UniverseAPI {
             commandManager,
             net.md_5.bungee.api.CommandSender::class.java
         )
-        annotationParser.parse(UniverseCloudCommands(ProxyServer.getInstance(), this))
+        annotationParser.parse(UniverseCloudCommands(ProxyServer.getInstance(), api))
 
         // Register API
-        Universe.register(this)
+        Universe.register(api)
 
         logger.info("Universe BungeeCord plugin enabled. Polling $masterUrl every ${pollInterval}s")
     }
@@ -84,6 +76,7 @@ class UniverseBungeePlugin : Plugin(), UniverseAPI {
                 # Universe BungeeCord Plugin Configuration
                 master-url: "http://localhost:6000"
                 poll-interval-seconds: 10
+                # api-key: ""
                 """.trimIndent()
             )
         }
@@ -93,6 +86,8 @@ class UniverseBungeePlugin : Plugin(), UniverseAPI {
         var masterUrl = System.getProperty("universe.master.url")
             ?: System.getenv("UNIVERSE_MASTER_URL")
             ?: "http://localhost:6000"
+        var apiKey = System.getProperty("universe.api.key")
+            ?: System.getenv("UNIVERSE_API_KEY")
         var pollInterval = 10L
 
         for (line in lines) {
@@ -103,10 +98,16 @@ class UniverseBungeePlugin : Plugin(), UniverseAPI {
             if (trimmed.startsWith("poll-interval-seconds:")) {
                 pollInterval = trimmed.substringAfter(":").trim().toLongOrNull() ?: 10L
             }
+            if (trimmed.startsWith("api-key:")) {
+                val key = trimmed.substringAfter(":").trim().trim('"')
+                if (key.isNotBlank()) {
+                    apiKey = key
+                }
+            }
         }
 
-        return BungeeConfig(masterUrl, pollInterval)
+        return BungeeConfig(masterUrl, apiKey, pollInterval)
     }
 
-    data class BungeeConfig(val masterUrl: String, val pollIntervalSeconds: Long)
+    data class BungeeConfig(val masterUrl: String, val apiKey: String?, val pollIntervalSeconds: Long)
 }

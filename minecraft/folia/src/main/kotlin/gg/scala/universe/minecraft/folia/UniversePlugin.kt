@@ -1,7 +1,6 @@
 package gg.scala.universe.minecraft.folia
 
 import gg.scala.universe.minecraft.api.Universe
-import gg.scala.universe.minecraft.api.UniverseAPI
 import org.bukkit.Bukkit
 import org.bukkit.plugin.java.JavaPlugin
 import org.incendo.cloud.annotations.AnnotationParser
@@ -10,20 +9,11 @@ import org.incendo.cloud.paper.PaperCommandManager
 import org.incendo.cloud.paper.util.sender.PaperSimpleSenderMapper
 import java.util.concurrent.TimeUnit
 
-class UniversePlugin : JavaPlugin(), UniverseAPI {
+class UniversePlugin : JavaPlugin() {
 
-    private lateinit var apiImpl: FoliaUniverseAPIImpl
+    private lateinit var api: FoliaUniverseAPIImpl
     private lateinit var reporter: InstanceReporter
     private var heartbeatTask: io.papermc.paper.threadedregions.scheduler.ScheduledTask? = null
-
-    // ---- UniverseAPI implementation ----
-
-    override fun getMasterUrl(): String = apiImpl.getMasterUrl()
-    override fun getInstanceId(): String? = apiImpl.getInstanceId()
-    override fun isConnected(): Boolean = apiImpl.isConnected()
-    override fun getInstanceManager() = apiImpl.getInstanceManager()
-    override fun getConfigurationManager() = apiImpl.getConfigurationManager()
-    override fun getTemplateManager() = apiImpl.getTemplateManager()
 
     // ---- Plugin lifecycle ----
 
@@ -32,14 +22,15 @@ class UniversePlugin : JavaPlugin(), UniverseAPI {
 
         val masterUrl = resolveMasterUrl()
         val instanceId = resolveInstanceId()
+        val apiKey = resolveApiKey()
 
         if (instanceId == null) {
             logger.warning("No Universe instance ID configured. Set universe.instance.id system property, UNIVERSE_INSTANCE_ID env var, or instance-id in config.yml")
             return
         }
 
-        apiImpl = FoliaUniverseAPIImpl(masterUrl, instanceId, logger)
-        reporter = InstanceReporter(masterUrl, instanceId, logger)
+        api = FoliaUniverseAPIImpl(masterUrl, instanceId, apiKey, logger)
+        reporter = InstanceReporter(masterUrl, instanceId, apiKey, logger)
 
         // Report ONLINE state
         reporter.reportState(gg.scala.universe.minecraft.api.InstanceState.ONLINE)
@@ -63,10 +54,10 @@ class UniversePlugin : JavaPlugin(), UniverseAPI {
             commandManager,
             org.incendo.cloud.paper.util.sender.Source::class.java
         )
-        annotationParser.parse(UniverseCloudCommands(this))
+        annotationParser.parse(UniverseCloudCommands(api))
 
         // Register API
-        Universe.register(this)
+        Universe.register(api)
 
         logger.info("Universe plugin enabled for instance $instanceId (Folia)")
     }
@@ -94,5 +85,11 @@ class UniversePlugin : JavaPlugin(), UniverseAPI {
         return System.getProperty("universe.instance.id")
             ?: System.getenv("UNIVERSE_INSTANCE_ID")
             ?: config.getString("instance-id")
+    }
+
+    private fun resolveApiKey(): String? {
+        return System.getProperty("universe.api.key")
+            ?: System.getenv("UNIVERSE_API_KEY")
+            ?: config.getString("api-key")?.takeIf { it.isNotBlank() }
     }
 }
