@@ -53,13 +53,14 @@ class MySQLDatabaseProvider(private val config: DatabaseConfiguration) : Databas
     }
 
     private fun createSchema() {
-        dsl!!.createTableIfNotExists("api_keys")
-            .column("key_id", SQLDataType.VARCHAR(64).nullable(false))
-            .column("token", SQLDataType.VARCHAR(256).nullable(false))
-            .column("permission", SQLDataType.VARCHAR(16).nullable(false))
+        val table = DSL.name("api_keys")
+        dsl!!.createTableIfNotExists(table)
+            .column(DSL.name("key_id"), SQLDataType.VARCHAR(64).nullable(false))
+            .column(DSL.name("token"), SQLDataType.VARCHAR(256).nullable(false))
+            .column(DSL.name("permission"), SQLDataType.VARCHAR(16).nullable(false))
             .constraints(
-                DSL.constraint("pk_api_keys").primaryKey("key_id"),
-                DSL.constraint("uk_api_keys_token").unique("token")
+                DSL.constraint("pk_api_keys").primaryKey(DSL.name("key_id")),
+                DSL.constraint("uk_api_keys_token").unique(DSL.name("token"))
             )
             .execute()
     }
@@ -67,47 +68,51 @@ class MySQLDatabaseProvider(private val config: DatabaseConfiguration) : Databas
     // ─── API Key Operations ───
 
     override fun getApiKeyByToken(token: String): ApiKey? {
-        return dsl!!.selectFrom("api_keys")
-            .where(DSL.field("token").eq(token))
+        return dsl!!.selectFrom(DSL.name("api_keys"))
+            .where(DSL.field(DSL.name("token")).eq(token))
             .fetchOne()
             ?.toApiKey()
     }
 
     override fun getApiKeyById(keyId: String): ApiKey? {
-        return dsl!!.selectFrom("api_keys")
-            .where(DSL.field("key_id").eq(keyId))
+        return dsl!!.selectFrom(DSL.name("api_keys"))
+            .where(DSL.field(DSL.name("key_id")).eq(keyId))
             .fetchOne()
             ?.toApiKey()
     }
 
     override fun saveApiKey(apiKey: ApiKey) {
-        dsl!!.insertInto(DSL.table("api_keys"))
-            .set(DSL.field("key_id", String::class.java), apiKey.keyId)
-            .set(DSL.field("token", String::class.java), apiKey.token)
-            .set(DSL.field("permission", String::class.java), apiKey.permission.name)
+        val table = DSL.table(DSL.name("api_keys"))
+        val keyIdField = DSL.field(DSL.name("key_id"))
+        val tokenField = DSL.field(DSL.name("token"), String::class.java)
+        val permField = DSL.field(DSL.name("permission"), String::class.java)
+        dsl!!.insertInto(table)
+            .set(keyIdField, apiKey.keyId)
+            .set(tokenField, apiKey.token)
+            .set(permField, apiKey.permission.name)
             .onDuplicateKeyUpdate()
-            .set(DSL.field("token", String::class.java), apiKey.token)
-            .set(DSL.field("permission", String::class.java), apiKey.permission.name)
+            .set(tokenField, apiKey.token)
+            .set(permField, apiKey.permission.name)
             .execute()
     }
 
     override fun deleteApiKey(keyId: String) {
-        dsl!!.deleteFrom(DSL.table("api_keys"))
-            .where(DSL.field("key_id").eq(keyId))
+        dsl!!.deleteFrom(DSL.table(DSL.name("api_keys")))
+            .where(DSL.field(DSL.name("key_id")).eq(keyId))
             .execute()
     }
 
     override fun listApiKeys(): List<ApiKey> {
-        return dsl!!.selectFrom("api_keys")
+        return dsl!!.selectFrom(DSL.name("api_keys"))
             .fetch()
             .map { it.toApiKey() }
     }
 
     private fun org.jooq.Record.toApiKey(): ApiKey {
         return ApiKey(
-            keyId = get("key_id", String::class.java),
-            token = get("token", String::class.java),
-            permission = ApiPermission.valueOf(get("permission", String::class.java))
+            keyId = get(DSL.name("key_id"), String::class.java),
+            token = get(DSL.name("token"), String::class.java),
+            permission = ApiPermission.valueOf(get(DSL.name("permission"), String::class.java))
         )
     }
 }
