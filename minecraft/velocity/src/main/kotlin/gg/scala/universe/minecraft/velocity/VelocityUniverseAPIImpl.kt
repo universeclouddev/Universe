@@ -14,6 +14,7 @@ import org.slf4j.Logger
 class VelocityUniverseAPIImpl(
     private val masterUrl: String,
     private val instanceId: String?,
+    private val apiKey: String?,
     private val logger: Logger
 ) : UniverseAPI {
 
@@ -232,6 +233,11 @@ class VelocityUniverseAPIImpl(
         return try {
             val requestBuilder = HttpRequest.newBuilder(URI.create(url))
                 .header("Content-Type", "application/json")
+                .apply {
+                    if (!apiKey.isNullOrBlank()) {
+                        header("Authorization", "Bearer $apiKey")
+                    }
+                }
                 .timeout(java.time.Duration.ofSeconds(10))
 
             val request = when (method) {

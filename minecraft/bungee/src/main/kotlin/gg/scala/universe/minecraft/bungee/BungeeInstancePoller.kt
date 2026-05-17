@@ -13,6 +13,7 @@ import java.util.logging.Logger
 
 class BungeeInstancePoller(
     private val masterUrl: String,
+    private val apiKey: String?,
     private val serverRegistry: BungeeServerRegistry,
     private val logger: Logger
 ) {
@@ -48,6 +49,11 @@ class BungeeInstancePoller(
             val url = "$masterUrl/api/instances"
             val request = HttpRequest.newBuilder(URI.create(url))
                 .GET()
+                .apply {
+                    if (!apiKey.isNullOrBlank()) {
+                        header("Authorization", "Bearer $apiKey")
+                    }
+                }
                 .timeout(java.time.Duration.ofSeconds(5))
                 .build()
 

@@ -10,6 +10,7 @@ import java.util.logging.Logger
 class InstanceReporter(
     private val masterUrl: String,
     private val instanceId: String,
+    private val apiKey: String?,
     private val logger: Logger
 ) {
     private val gson = Gson()
@@ -50,6 +51,9 @@ class InstanceReporter(
             connection.requestMethod = "GET"
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
+            if (!apiKey.isNullOrBlank()) {
+                connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            }
             val responseCode = connection.responseCode
             val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
             connection.disconnect()
@@ -71,6 +75,9 @@ class InstanceReporter(
                 connection.requestMethod = method
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json")
+                if (!apiKey.isNullOrBlank()) {
+                    connection.setRequestProperty("Authorization", "Bearer $apiKey")
+                }
                 connection.connectTimeout = 10000
                 connection.readTimeout = 10000
 

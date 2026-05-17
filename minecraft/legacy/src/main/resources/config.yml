@@ -9,5 +9,8 @@ master-url: "http://localhost:6000"
 # Instance ID (auto-detected from env/property if not set)
 # instance-id: ""
 
+# API Key for Bearer authentication (optional)
+# api-key: ""
+
 # Heartbeat interval in seconds
 heartbeat-interval-seconds: 30

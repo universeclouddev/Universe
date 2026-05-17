@@ -13,6 +13,7 @@ import java.util.logging.Logger
 class LegacyUniverseAPIImpl(
     private val masterUrl: String,
     private val instanceId: String?,
+    private val apiKey: String?,
     private val logger: Logger
 ) : UniverseAPI {
 
@@ -233,6 +234,9 @@ class LegacyUniverseAPIImpl(
             connection.connectTimeout = 10000
             connection.readTimeout = 10000
             connection.setRequestProperty("Content-Type", "application/json")
+            if (!apiKey.isNullOrBlank()) {
+                connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            }
 
             if (body != null && method in listOf("POST", "PUT")) {
                 connection.doOutput = true

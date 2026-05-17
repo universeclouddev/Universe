@@ -11,6 +11,7 @@ import java.util.logging.Logger
 class InstanceReporter(
     private val masterUrl: String,
     private val instanceId: String,
+    private val apiKey: String?,
     private val logger: Logger
 ) {
     private val client = HttpClient.newHttpClient()
@@ -51,6 +52,11 @@ class InstanceReporter(
             val url = "$masterUrl/api/instances/$instanceId"
             val request = HttpRequest.newBuilder(URI.create(url))
                 .GET()
+                .apply {
+                    if (!apiKey.isNullOrBlank()) {
+                        header("Authorization", "Bearer $apiKey")
+                    }
+                }
                 .timeout(java.time.Duration.ofSeconds(5))
                 .build()
             val response = client.send(request, HttpResponse.BodyHandlers.ofString())
@@ -69,6 +75,11 @@ class InstanceReporter(
             try {
                 val requestBuilder = HttpRequest.newBuilder(URI.create(url))
                     .header("Content-Type", "application/json")
+                    .apply {
+                        if (!apiKey.isNullOrBlank()) {
+                            header("Authorization", "Bearer $apiKey")
+                        }
+                    }
                     .timeout(java.time.Duration.ofSeconds(10))
 
                 val request = when (method) {

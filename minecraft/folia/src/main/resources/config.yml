@@ -1,4 +1,16 @@
+# Universe Folia Plugin Configuration
+# Instance ID and master URL can also be set via:
+#   - System property: -Duniverse.instance.id=abc123 -Duniverse.master.url=http://localhost:6000
+#   - Environment variable: UNIVERSE_INSTANCE_ID=abc123 UNIVERSE_MASTER_URL=http://localhost:6000
+
 # Universe Master REST API URL
 master-url: "http://localhost:6000"
+
+# Instance ID (auto-detected from env/property if not set)
 # instance-id: ""
+
+# API Key for Bearer authentication (optional)
+# api-key: ""
+
+# Heartbeat interval in seconds
 heartbeat-interval-seconds: 30
