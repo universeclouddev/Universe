@@ -1,0 +1,35 @@
+<configuration>
+    <!-- Console appender: minimal output matching Console aesthetic -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- File appender for full diagnostics (always captures everything) -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>./logs/universe.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>./logs/universe-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Framework loggers: only WARN and above go to console, everything goes to file -->
+    <logger name="com.hazelcast" level="WARN"/>
+    <logger name="io.fabric8.kubernetes" level="WARN"/>
+    <logger name="com.github.dockerjava" level="WARN"/>
+    <logger name="org.apache.http" level="WARN"/>
+    <logger name="software.amazon.awssdk" level="WARN"/>
+
+    <!-- Universe internal: INFO+ to file, WARN+ to console -->
+    <logger name="gg.scala.universe" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>
