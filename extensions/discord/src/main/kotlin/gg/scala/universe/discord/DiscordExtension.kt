@@ -124,11 +124,11 @@ class DiscordExtension : Extension {
     private fun defaultConfigJson(): String = """
     {
       "token": "YOUR_BOT_TOKEN_HERE",
-      "guild-id": "",
-      "status-channel-id": "",
-      "log-channel-id": "",
-      "embed-color": 5814783,
-      "allowed-role-ids": [],
+      "guildId": "",
+      "statusChannelId": "",
+      "logChannelId": "",
+      "embedColor": 5814783,
+      "allowedRoleIds": [],
       "intents": ["MESSAGE_CONTENT", "GUILD_MESSAGES", "GUILD_MEMBERS"]
     }
     """.trimIndent()
