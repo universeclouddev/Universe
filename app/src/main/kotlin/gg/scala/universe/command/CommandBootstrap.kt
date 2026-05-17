@@ -4,7 +4,9 @@ import com.google.inject.Inject
 import com.google.inject.Singleton
 import gg.scala.universe.console.log
 import gg.scala.universe.console.LogLevel
+import gg.scala.universe.command.commands.ApiKeyManagementCommands
 import gg.scala.universe.command.commands.ManagementCommands
+import gg.scala.universe.command.exception.CommandExceptionHandler
 import gg.scala.universe.command.commands.TemplateSyncCommand
 import gg.scala.universe.config.UniverseMainConfiguration
 import org.jline.reader.Candidate
@@ -24,7 +26,9 @@ import org.jline.terminal.TerminalBuilder
 class CommandBootstrap @Inject constructor(
     private val commandProvider: CommandProvider,
     private val consoleSource: ConsoleCommandSource,
-    private val configuration: UniverseMainConfiguration
+    private val configuration: UniverseMainConfiguration,
+    private val exceptionHandler: CommandExceptionHandler,
+    private val apiKeyManagementCommands: ApiKeyManagementCommands
 ) {
 
     private var consoleThread: Thread? = null
@@ -36,6 +40,7 @@ class CommandBootstrap @Inject constructor(
     fun start() {
         commandProvider.register(TemplateSyncCommand::class.java)
         commandProvider.register(ManagementCommands::class.java)
+        commandProvider.register(ApiKeyManagementCommands::class.java)
 
         ConsoleRenderer.printBanner(configuration)
 
@@ -106,11 +111,11 @@ class CommandBootstrap @Inject constructor(
                     try {
                         commandProvider.execute(consoleSource, line)
                             .exceptionally { throwable ->
-                                log("Error executing command: ${throwable.message}", LogLevel.ERROR)
+                                exceptionHandler.handle(consoleSource, throwable)
                                 null
                             }
                     } catch (e: Exception) {
-                        log("Error executing command: ${e.message}", LogLevel.ERROR)
+                        exceptionHandler.handle(consoleSource, e)
                     }
                 }
             } catch (e: Exception) {
