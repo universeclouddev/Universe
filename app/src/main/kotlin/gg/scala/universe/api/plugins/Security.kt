@@ -1,5 +1,7 @@
 package gg.scala.universe.api.plugins
 
+import com.google.inject.Inject
+import com.google.inject.Singleton
 import gg.scala.universe.console.log
 import gg.scala.universe.db.DatabaseProvider
 import gg.scala.universe.schema.ApiKey
@@ -16,7 +18,8 @@ import kotlin.time.Duration.Companion.seconds
  *
  * Keys are cached for 15 seconds before re-fetching from the database.
  */
-class ApiKeyCache(private val database: DatabaseProvider) {
+@Singleton
+class ApiKeyCache @Inject constructor(private val database: DatabaseProvider) {
     private data class CachedEntry(val key: ApiKey?, val timestamp: Long)
 
     private val cache = ConcurrentHashMap<String, CachedEntry>()
@@ -42,9 +45,7 @@ class ApiKeyCache(private val database: DatabaseProvider) {
     }
 }
 
-fun Application.configureSecurity(database: DatabaseProvider) {
-    val cache = ApiKeyCache(database)
-
+fun Application.configureSecurity(cache: ApiKeyCache) {
     install(Authentication) {
         bearer("protected") {
             realm = "Access to protected endpoints"

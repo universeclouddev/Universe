@@ -1,24 +1,28 @@
 package gg.scala.universe.api.plugins
 
+import gg.scala.universe.console.log
 import gg.scala.universe.schema.ApiKey
 import gg.scala.universe.schema.ApiPermission
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.createRouteScopedPlugin
-import io.ktor.server.auth.authentication
 import io.ktor.server.response.respond
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Configuration for the API-key-aware sliding window rate limiter.
  *
  * @param rate The time window for rate limiting (e.g., 10.seconds).
  * @param capacity Maximum number of calls allowed within the time window.
+ * @param keyCache The API key cache used to validate tokens.
  */
 class RateLimitConfig {
-    var rate: Duration = Duration.parse("10s")
+    var rate: Duration = 60.seconds
     var capacity: Int = 100
+    var keyCache: ApiKeyCache? = null
 }
 
 /**
@@ -28,19 +32,23 @@ class RateLimitConfig {
  * - Keys with [ApiPermission.ALL] bypass rate limiting entirely.
  * - Keys with [ApiPermission.PUBLIC] are tracked per-key.
  * - When the capacity is exceeded, 429 Too Many Requests is returned.
+ *
+ * Note: Reads the Authorization header directly because `onCall` runs
+ * before Ktor's authentication interceptor sets the principal.
  */
 val RateLimiting = createRouteScopedPlugin(
     name = "RateLimiting",
     createConfiguration = ::RateLimitConfig
 ) {
+    val cache = pluginConfig.keyCache
+        ?: throw IllegalStateException("RateLimiting plugin requires keyCache to be set")
     val rateLimiter = ApiKeyAwareSlidingWindowRateLimiter(
         rate = pluginConfig.rate,
         capacity = pluginConfig.capacity
     )
 
     onCall { call ->
-        val result = rateLimiter.tryAccept(call)
-        when (result) {
+        when (val result = rateLimiter.tryAccept(call, cache)) {
             is RateLimitResult.Allowed -> { /* proceed */ }
             is RateLimitResult.Denied -> {
                 call.respond(
@@ -55,7 +63,7 @@ val RateLimiting = createRouteScopedPlugin(
             is RateLimitResult.Unauthenticated -> {
                 call.respond(
                     HttpStatusCode.Unauthorized,
-                    mapOf("error" to "Authentication required for rate-limited endpoints")
+                    mapOf("error" to "Authentication required")
                 )
             }
         }
@@ -75,8 +83,19 @@ class ApiKeyAwareSlidingWindowRateLimiter(
     private val timeWindowMs = rate.inWholeMilliseconds
     private val timestamps = ConcurrentHashMap<String, MutableList<Long>>()
 
-    fun tryAccept(call: ApplicationCall): RateLimitResult {
-        val apiKey = call.authentication.principal<ApiKey>()
+    fun tryAccept(call: ApplicationCall, cache: ApiKeyCache): RateLimitResult {
+        // Read Authorization header directly (onCall runs before auth interceptor)
+        val authHeader = call.request.headers[HttpHeaders.Authorization]
+        if (authHeader == null || !authHeader.startsWith("Bearer ", ignoreCase = true)) {
+            return RateLimitResult.Unauthenticated
+        }
+
+        val token = authHeader.substringAfter("Bearer ", "")
+        if (token.isBlank()) {
+            return RateLimitResult.Unauthenticated
+        }
+
+        val apiKey = cache.getByToken(token)
             ?: return RateLimitResult.Unauthenticated
 
         // Admin keys bypass rate limiting

@@ -2,6 +2,7 @@ package gg.scala.universe.api
 
 import com.google.inject.Inject
 import com.hazelcast.core.HazelcastInstance
+import gg.scala.universe.api.plugins.ApiKeyCache
 import gg.scala.universe.api.plugins.configureCors
 import gg.scala.universe.api.plugins.configureDocumentation
 import gg.scala.universe.api.plugins.configureExceptionCatcher
@@ -49,7 +50,8 @@ class KtorServerService @Inject constructor(
     private val templateManager: TemplateManager,
     private val templateSyncService: TemplateSyncService,
     private val databaseProvider: DatabaseProvider,
-    private val metricsRegistry: MetricsRegistry
+    private val metricsRegistry: MetricsRegistry,
+    private val apiKeyCache: ApiKeyCache
 ) {
     private var server: io.ktor.server.engine.EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -81,7 +83,8 @@ class KtorServerService @Inject constructor(
                     templateManager,
                     templateSyncService,
                     databaseProvider,
-                    metricsRegistry
+                    metricsRegistry,
+                    apiKeyCache
                 )
             }
         ).start(wait = false)
@@ -105,7 +108,8 @@ private fun Application.configureServerModule(
     templateManager: TemplateManager,
     templateSyncService: TemplateSyncService,
     databaseProvider: DatabaseProvider,
-    metricsRegistry: MetricsRegistry
+    metricsRegistry: MetricsRegistry,
+    apiKeyCache: ApiKeyCache
 ) {
     install(WebSockets) {
         pingPeriod = 15.seconds
@@ -115,14 +119,14 @@ private fun Application.configureServerModule(
     }
 
     configureCors()
-    configureSecurity(databaseProvider)
+    configureSecurity(apiKeyCache)
     configureLoggingMessages()
     configureSerialization()
     configureExceptionCatcher()
     configureDocumentation()
 
     configureCommandRoutes(commandProvider)
-    configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, instanceCreationService)
+    configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, instanceCreationService, apiKeyCache)
     configureConfigurationRoutes(clusterStateService)
     configureClusterRoutes(clusterStateService, hazelcastInstance, taskDispatcher)
     configureNodeRoutes(configuration, hazelcastInstance, commandProvider)
