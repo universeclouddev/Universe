@@ -54,9 +54,7 @@ class UniverseApplication {
 
         injector = Guice.createInjector(guiceModules)
 
-        hzService = HazelcastService()
-        injector.injectMembers(hzService)
-        hzService.start()
+        hzService = injector.getInstance(HazelcastService::class.java)
 
         // Register built-in runtime providers
         val runtimeRegistry = injector.getInstance(RuntimeRegistry::class.java)
