@@ -19,35 +19,35 @@ object Console {
     // ─── Public Logging API ───
 
     /** Informational message — blue arrow prefix. */
-    fun info(message: String) {
-        println(tree("→", Ansi.BLUE, message))
+    fun info(message: String, iconEnabled: Boolean) {
+        println(tree("→", Ansi.BLUE, message, iconEnabled = iconEnabled))
     }
 
     /** Success message — green checkmark prefix. */
-    fun success(message: String) {
-        println(tree("✓", Ansi.GREEN, message, Ansi.GREEN))
+    fun success(message: String, iconEnabled: Boolean) {
+        println(tree("✓", Ansi.GREEN, message, Ansi.GREEN, iconEnabled))
     }
 
     /** Warning message — yellow warning prefix. */
-    fun warn(message: String) {
-        println(tree("⚠", Ansi.YELLOW, message, Ansi.YELLOW))
+    fun warn(message: String, iconEnabled: Boolean) {
+        println(tree("⚠", Ansi.YELLOW, message, Ansi.YELLOW, iconEnabled))
     }
 
     /** Error message — red cross prefix. */
-    fun error(message: String) {
-        println(tree("✗", Ansi.RED, message, Ansi.RED))
+    fun error(message: String, iconEnabled: Boolean) {
+        println(tree("✗", Ansi.RED, message, Ansi.RED, iconEnabled))
     }
 
     /** Debug message — dimmed, only shown when debug is enabled. */
-    fun debug(message: String) {
+    fun debug(message: String, iconEnabled: Boolean) {
         if (debugEnabled) {
-            println(tree("◆", Ansi.DARK_GRAY, message, Ansi.DIM))
+            println(tree("◆", Ansi.DARK_GRAY, message, Ansi.DIM, iconEnabled))
         }
     }
 
     /** Network message — cyan arrow prefix. */
-    fun network(message: String) {
-        println(tree("⇄", Ansi.CYAN, message, Ansi.CYAN))
+    fun network(message: String, iconEnabled: Boolean) {
+        println(tree("⇄", Ansi.CYAN, message, Ansi.CYAN, iconEnabled))
     }
 
     /** Plain message with no prefix. */
@@ -56,7 +56,7 @@ object Console {
     }
 
     /** Sub-tree item — indented gray arrow. */
-    fun sub(message: String) {
+    fun sub(message: String, iconEnabled: Boolean) {
         println("  ${Ansi.DARK_GRAY}↳${Ansi.RESET} $message")
     }
 
@@ -121,8 +121,8 @@ object Console {
 
     // ─── Private Helpers ───
 
-    private fun tree(icon: String, iconColor: String, message: String, color: String = Ansi.RESET): String {
-        return "  ${iconColor}${icon}${color} $message"
+    private fun tree(icon: String, iconColor: String, message: String, color: String = Ansi.RESET, iconEnabled: Boolean): String {
+        return "  ${if (iconEnabled) "${iconColor}${icon}" else ""}${color} $message"
     }
 }
 
@@ -130,14 +130,14 @@ object Console {
  * Legacy compatibility shim for migrating from PrettyLog's `log()` function.
  * Maps PrettyLog log types to Console methods.
  */
-fun log(message: String, type: LogLevel = LogLevel.INFO) {
+fun log(message: String, type: LogLevel = LogLevel.INFO, icon: Boolean = true) {
     when (type) {
-        LogLevel.INFO -> Console.info(message)
-        LogLevel.SUCCESS -> Console.success(message)
-        LogLevel.WARNING -> Console.warn(message)
-        LogLevel.ERROR -> Console.error(message)
-        LogLevel.DEBUG -> Console.debug(message)
-        LogLevel.NETWORK -> Console.network(message)
+        LogLevel.INFO -> Console.info(message, icon)
+        LogLevel.SUCCESS -> Console.success(message, icon)
+        LogLevel.WARNING -> Console.warn(message, icon)
+        LogLevel.ERROR -> Console.error(message, icon)
+        LogLevel.DEBUG -> Console.debug(message, icon)
+        LogLevel.NETWORK -> Console.network(message, icon)
     }
 }
 

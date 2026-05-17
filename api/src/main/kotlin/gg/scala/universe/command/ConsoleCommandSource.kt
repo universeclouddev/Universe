@@ -15,7 +15,7 @@ import gg.scala.universe.console.log
 class ConsoleCommandSource @Inject constructor() : CommandSource {
 
     override fun sendMessage(message: String) {
-        log(message)
+        log(message, icon = false)
     }
 
     override fun sendMessage(vararg messages: String) {
