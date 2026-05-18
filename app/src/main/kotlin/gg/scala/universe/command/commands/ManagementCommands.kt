@@ -22,6 +22,7 @@ import io.ktor.server.routing.routing
 import io.ktor.http.HttpStatusCode
 import org.incendo.cloud.annotations.Argument
 import org.incendo.cloud.annotations.Command
+import org.incendo.cloud.annotation.specifier.FlagYielding
 import com.hazelcast.core.HazelcastInstance
 import gg.scala.universe.hz.nodeName
 import kotlinx.coroutines.delay
@@ -248,8 +249,9 @@ class ManagementCommands @Inject constructor(
     fun instanceExecute(
         source: CommandSource,
         @Argument("id") instanceId: String,
-        @Argument("command") command: String
+        @FlagYielding @Argument("command") command: String
     ) {
+
         val instance = clusterStateService.getInstance(instanceId)
         if (instance == null) {
             source.sendMessage("Instance '$instanceId' not found.")
