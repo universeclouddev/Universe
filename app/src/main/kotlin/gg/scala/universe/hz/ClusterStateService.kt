@@ -37,15 +37,16 @@ class ClusterStateService @Inject constructor(
     }
 
     /**
-     * Returns all instances, filtering out those that have been OFFLINE for more than [staleThresholdMs].
+     * Returns all instances, filtering out those that have been OFFLINE or STOPPED
+     * for more than [staleThresholdMs] (default 15s for OFFLINE, 10s for STOPPED).
      */
     fun getActiveInstances(staleThresholdMs: Long = 15000): Collection<InstanceInfo> {
         val now = System.currentTimeMillis()
         return instances.values.filter { instance ->
-            if (instance.state == InstanceState.OFFLINE) {
-                now - instance.lastHeartbeat <= staleThresholdMs
-            } else {
-                true
+            when (instance.state) {
+                InstanceState.OFFLINE -> now - instance.lastHeartbeat <= staleThresholdMs
+                InstanceState.STOPPED -> now - instance.lastHeartbeat <= 10_000L
+                else -> true
             }
         }
     }
@@ -64,7 +65,10 @@ class ClusterStateService @Inject constructor(
 
     fun updateInstanceState(id: String, state: InstanceState) {
         val existing = instances[id] ?: return
-        instances[id] = existing.copy(state = state)
+        instances[id] = existing.copy(
+            state = state,
+            lastHeartbeat = System.currentTimeMillis()
+        )
     }
 
     fun getNodeResources(nodeId: String): NodeResources {
