@@ -1,4 +1,0 @@
-# Universe Velocity Plugin Configuration
-master-url = "http://localhost:6000"
-poll-interval-seconds = 10
-# api-key = ""

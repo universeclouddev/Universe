@@ -35,6 +35,13 @@ tasks {
     build {
         dependsOn(shadowJar)
     }
+
+    processResources {
+        filesMatching("plugin.yml") {
+            expand(mapOf("version" to project.version))
+        }
+        outputs.upToDateWhen { false }
+    }
 }
 
 kotlin {

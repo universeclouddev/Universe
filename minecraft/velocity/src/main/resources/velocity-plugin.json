@@ -1,0 +1,8 @@
+{
+  "id": "universe",
+  "name": "Universe",
+  "description": "Auto-registers Universe instances as Velocity backends",
+  "version": "${version}",
+  "authors": ["Scala Universe"],
+  "main": "gg.scala.universe.minecraft.velocity.UniverseVelocityPlugin"
+}
