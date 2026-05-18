@@ -50,6 +50,15 @@ class InstancePoller(
     fun getLastInstances(): List<UniverseInstance> = lastInstances
     fun isConnected(): Boolean = connected
 
+    /**
+     * Returns online instances matching the given configuration name.
+     */
+    fun getInstancesByConfiguration(configurationName: String): List<UniverseInstance> {
+        return lastInstances.filter {
+            it.state == "ONLINE" && it.configurationName == configurationName
+        }
+    }
+
     private fun poll() {
         try {
             val url = "$masterUrl/api/instances"

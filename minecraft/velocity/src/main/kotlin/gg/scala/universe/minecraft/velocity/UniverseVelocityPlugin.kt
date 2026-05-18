@@ -13,6 +13,7 @@ import org.incendo.cloud.annotations.AnnotationParser
 import org.incendo.cloud.execution.ExecutionCoordinator
 import org.incendo.cloud.velocity.VelocityCommandManager
 import org.slf4j.Logger
+import java.io.File
 import java.nio.file.Path
 
 @Plugin(
@@ -31,12 +32,13 @@ class UniverseVelocityPlugin @Inject constructor(
     private lateinit var api: VelocityUniverseAPIImpl
     private lateinit var serverRegistry: ServerRegistry
     private lateinit var poller: InstancePoller
+    private lateinit var config: VelocityConfig
 
     // ---- Lifecycle ----
 
     @Subscribe
     fun onProxyInitialization(event: ProxyInitializeEvent) {
-        val config = loadConfig()
+        config = loadConfig()
         val masterUrl = config.masterUrl
         val apiKey = config.apiKey
         val pollInterval = config.pollIntervalSeconds
@@ -47,6 +49,17 @@ class UniverseVelocityPlugin @Inject constructor(
 
         // Start polling
         poller.start(pollInterval)
+
+        // Register auto-connect listener if enabled
+        if (config.autoConnect.enabled && config.autoConnect.configurationType.isNotBlank()) {
+            val listener = AutoConnectListener(
+                proxy = proxy,
+                config = config.autoConnect,
+                poller = poller
+            )
+            proxy.eventManager.register(this, listener)
+            logger.info("Auto-connect enabled: configuration='{}', strategy={}", config.autoConnect.configurationType, config.autoConnect.strategy)
+        }
 
         // Register Cloud commands
         val pluginContainer = proxy.pluginManager.fromInstance(this).orElseThrow()
@@ -80,19 +93,28 @@ class UniverseVelocityPlugin @Inject constructor(
     }
 
     private fun loadConfig(): VelocityConfig {
-        val configFile = dataDirectory.resolve("config.toml").toFile()
+        val configFile = dataDirectory.resolve("config.yml").toFile()
         if (!configFile.exists()) {
             dataDirectory.toFile().mkdirs()
             configFile.writeText(
                 """
                 # Universe Velocity Plugin Configuration
-                master-url = "http://localhost:6000"
-                poll-interval-seconds = 10
-                # api-key = ""
+                master-url: "http://localhost:6000"
+                poll-interval-seconds: 10
+                # api-key: ""
+
+                # Auto-connect: automatically route players to a server on join
+                auto-connect:
+                  enabled: false
+                  # The configuration type to connect players to (e.g., "lobby", "hub")
+                  configuration-type: "lobby"
+                  # Server selection strategy: least_populated, most_populated, random
+                  strategy: "least_populated"
                 """.trimIndent()
             )
         }
-        // Simple TOML parsing: read key = value lines
+
+        // Simple YAML-like parsing (read key: value lines)
         val lines = configFile.readLines()
         var masterUrl = System.getProperty("universe.master.url")
             ?: System.getenv("UNIVERSE_MASTER_URL")
@@ -101,24 +123,120 @@ class UniverseVelocityPlugin @Inject constructor(
             ?: System.getenv("UNIVERSE_API_KEY")
         var pollInterval = 10L
 
+        // Auto-connect defaults
+        var autoConnectEnabled = false
+        var autoConnectConfigType = "lobby"
+        var autoConnectStrategy = "least_populated"
+
+        var inAutoConnect = false
         for (line in lines) {
             val trimmed = line.trim()
-            if (trimmed.startsWith("master-url")) {
-                masterUrl = trimmed.substringAfter("=").trim().trim('"')
+
+            // Detect auto-connect section
+            if (trimmed.startsWith("auto-connect:")) {
+                inAutoConnect = true
+                continue
             }
-            if (trimmed.startsWith("poll-interval-seconds")) {
-                pollInterval = trimmed.substringAfter("=").trim().toLongOrNull() ?: 10L
+
+            // If we're in auto-connect section, parse its keys
+            if (inAutoConnect) {
+                if (trimmed.startsWith("enabled:")) {
+                    autoConnectEnabled = trimmed.substringAfter(":").trim().toBoolean()
+                    continue
+                }
+                if (trimmed.startsWith("configuration-type:")) {
+                    autoConnectConfigType = trimmed.substringAfter(":").trim().trim('"')
+                    continue
+                }
+                if (trimmed.startsWith("strategy:")) {
+                    autoConnectStrategy = trimmed.substringAfter(":").trim().trim('"')
+                    continue
+                }
+                // If we hit a non-indented line that's not a continuation, exit section
+                if (!trimmed.startsWith("#") && !trimmed.startsWith("-") && !line.startsWith(" ") && !line.startsWith("\t") && trimmed.isNotEmpty()) {
+                    inAutoConnect = false
+                }
             }
-            if (trimmed.startsWith("api-key")) {
-                val key = trimmed.substringAfter("=").trim().trim('"')
-                if (key.isNotBlank()) {
-                    apiKey = key
+
+            if (!inAutoConnect) {
+                if (trimmed.startsWith("master-url:")) {
+                    masterUrl = trimmed.substringAfter(":").trim().trim('"')
+                }
+                if (trimmed.startsWith("poll-interval-seconds:")) {
+                    pollInterval = trimmed.substringAfter(":").trim().toLongOrNull() ?: 10L
+                }
+                if (trimmed.startsWith("api-key:")) {
+                    val key = trimmed.substringAfter(":").trim().trim('"')
+                    if (key.isNotBlank()) {
+                        apiKey = key
+                    }
                 }
             }
         }
 
-        return VelocityConfig(masterUrl, apiKey, pollInterval)
+        val strategy = try {
+            ServerSelectionStrategy.valueOf(autoConnectStrategy.uppercase())
+        } catch (_: IllegalArgumentException) {
+            ServerSelectionStrategy.LEAST_POPULATED
+        }
+
+        return VelocityConfig(
+            masterUrl = masterUrl,
+            apiKey = apiKey,
+            pollIntervalSeconds = pollInterval,
+            autoConnect = AutoConnectConfig(
+                enabled = autoConnectEnabled,
+                configurationType = autoConnectConfigType,
+                strategy = strategy
+            )
+        )
     }
 
-    data class VelocityConfig(val masterUrl: String, val apiKey: String?, val pollIntervalSeconds: Long)
+    data class VelocityConfig(
+        val masterUrl: String,
+        val apiKey: String?,
+        val pollIntervalSeconds: Long,
+        val autoConnect: AutoConnectConfig
+    )
+}
+
+/**
+ * Configuration for automatic player connection on join.
+ */
+data class AutoConnectConfig(
+    val enabled: Boolean,
+    val configurationType: String,
+    val strategy: ServerSelectionStrategy
+)
+
+/**
+ * Strategy for selecting which server to connect a player to.
+ */
+enum class ServerSelectionStrategy {
+    /** Connect to the server with the fewest players. */
+    LEAST_POPULATED,
+
+    /** Connect to the server with the most players (but not full). */
+    MOST_POPULATED,
+
+    /** Connect to a random available server. */
+    RANDOM;
+
+    /**
+     * Select a server from the available instances based on this strategy.
+     * Returns null if no suitable server is available.
+     */
+    fun select(instances: List<InstancePoller.UniverseInstance>): InstancePoller.UniverseInstance? {
+        if (instances.isEmpty()) return null
+
+        return when (this) {
+            LEAST_POPULATED -> instances.minByOrNull { it.players }
+            MOST_POPULATED -> {
+                // Filter out full servers, then pick the one with most players
+                val notFull = instances.filter { it.maxPlayers <= 0 || it.players < it.maxPlayers }
+                if (notFull.isEmpty()) null else notFull.maxByOrNull { it.players }
+            }
+            RANDOM -> instances.random()
+        }
+    }
 }

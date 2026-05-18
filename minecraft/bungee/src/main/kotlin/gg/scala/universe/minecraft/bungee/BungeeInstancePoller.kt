@@ -24,6 +24,9 @@ class BungeeInstancePoller(
     @Volatile
     private var running = false
 
+    @Volatile
+    private var currentInstances: List<BungeeInstance> = emptyList()
+
     fun start(intervalSeconds: Long, scheduler: ScheduledExecutorService) {
         if (running) return
         running = true
@@ -68,6 +71,7 @@ class BungeeInstancePoller(
                 object : TypeToken<List<BungeeInstance>>() {}.type
             )
 
+            currentInstances = instances
             val onlineInstances = instances.filter { it.state == "ONLINE" }
             val currentRegistered = serverRegistry.getRegisteredServers().keys.toMutableSet()
             val desiredServers = mutableSetOf<String>()
@@ -94,6 +98,15 @@ class BungeeInstancePoller(
 
         } catch (e: Exception) {
             logger.warning("Error polling Universe instances: ${e.message}")
+        }
+    }
+
+    /**
+     * Returns online instances matching the given configuration name.
+     */
+    fun getInstancesByConfiguration(configurationName: String): List<BungeeInstance> {
+        return currentInstances.filter {
+            it.state == "ONLINE" && it.configurationName == configurationName
         }
     }
 
