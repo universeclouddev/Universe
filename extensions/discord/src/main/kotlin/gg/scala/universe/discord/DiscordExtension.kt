@@ -13,6 +13,7 @@ import net.dv8tion.jda.api.entities.Activity
 import net.dv8tion.jda.api.requests.GatewayIntent
 import net.dv8tion.jda.api.utils.ChunkingFilter
 import net.dv8tion.jda.api.utils.MemberCachePolicy
+import net.dv8tion.jda.api.utils.cache.CacheFlag
 import org.incendo.cloud.discord.jda6.JDA6CommandManager
 import org.incendo.cloud.discord.jda6.JDAInteraction
 import org.incendo.cloud.execution.ExecutionCoordinator
@@ -63,6 +64,7 @@ class DiscordExtension : Extension {
         jda = JDABuilder.createDefault(config!!.token, intents)
             .setActivity(Activity.watching("Universe Cluster"))
             .setChunkingFilter(ChunkingFilter.ALL)
+            .disableCache(CacheFlag.VOICE_STATE, CacheFlag.EMOJI, CacheFlag.STICKER, CacheFlag.SOUNDBOARD_SOUNDS, CacheFlag.SCHEDULED_EVENTS)
             .setMemberCachePolicy(MemberCachePolicy.ALL)
             .addEventListeners(commandManager!!.createListener())
             .build()
