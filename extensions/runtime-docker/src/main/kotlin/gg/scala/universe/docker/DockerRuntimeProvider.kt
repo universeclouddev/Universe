@@ -117,15 +117,23 @@ class DockerRuntimeProvider(
             // cpu units: 100 = 1 core worth of CPU time
             val nanoCpus = cpu * 10_000_000L
             hostConfig.withNanoCPUs(nanoCpus)
-            log("Docker container '$containerName' CPU limit: ${cpu} units (${nanoCpus / 1_000_000_000.0} cores)")
+            log("Docker container '$containerName' CPU limit: $cpu units (${nanoCpus / 1_000_000_000.0} cores)")
         }
+
+        // Wrap command with FIFO pipe so executeCommand can send stdin to the process.
+        // exec 3<> keeps the write end open so cat never sees EOF.
+        val escaped = command.replace("'", "'\\''")
+        val wrapperScript = "rm -f /tmp/universe-cmdpipe 2>/dev/null; mkfifo /tmp/universe-cmdpipe; exec 3<> /tmp/universe-cmdpipe; cat <&3 | $escaped"
 
         val createCmd = dockerClient.createContainerCmd(imageRef)
             .withName(containerName)
             .withWorkingDir(config.containerWorkDir)
-            .withCmd("sh", "-c", command)
+            .withCmd("sh", "-c", wrapperScript)
             .withExposedPorts(*exposedPorts.toTypedArray())
             .withHostConfig(hostConfig)
+            .withTty(true)
+            .withAttachStdout(true)
+            .withAttachStderr(true)
 
         if (!environmentVariables.isNullOrEmpty()) {
             createCmd.withEnv(environmentVariables.map { (k, v) -> "$k=$v" })
@@ -182,14 +190,13 @@ class DockerRuntimeProvider(
             ?: return log("No Docker container found for instance $instanceId", LogLevel.WARNING)
 
         try {
+            // Write command to the FIFO pipe that feeds stdin to the main process
+            val escaped = command.replace("'", "'\\''")
             val exec = dockerClient.execCreateCmd(containerId)
-                .withCmd(command)
-                .withTty(true)
-                .withAttachStdin(true)
+                .withCmd("sh", "-c", "printf '%s\\n' '$escaped' > /tmp/universe-cmdpipe")
                 .withAttachStdout(true)
                 .withAttachStderr(true)
                 .exec()
-
             dockerClient.execStartCmd(exec.id).exec(com.github.dockerjava.api.async.ResultCallback.Adapter())
             log("Executed command in Docker container for instance $instanceId: $command")
         } catch (e: Exception) {
