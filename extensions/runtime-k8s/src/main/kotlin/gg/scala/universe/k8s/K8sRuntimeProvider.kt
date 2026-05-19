@@ -87,6 +87,8 @@ class K8sRuntimeProvider(
             .withImagePullPolicy(config.imagePullPolicy)
             .withCommand("sh", "-c", command)
             .withWorkingDir(config.workingDir)
+            .withStdin(true)
+            .withTty(true)
             .addNewPort()
                 .withContainerPort(port)
                 .withHostPort(port)
@@ -151,10 +153,12 @@ class K8sRuntimeProvider(
                 log("K8s pod '$podName' memory limit: ${ramMB}Mi")
             }
             if (cpu > 0) {
-                val q = Quantity("${cpu}m")
+                // cpu units: 100 = 1 core. K8s uses millicores (1000m = 1 core)
+                val millicores = cpu * 10
+                val q = Quantity("${millicores}m")
                 limits["cpu"] = q
                 requests["cpu"] = q
-                log("K8s pod '$podName' CPU limit: ${cpu}m")
+                log("K8s pod '$podName' CPU limit: $cpu units (${millicores}m / ${millicores / 1000.0} cores)")
             }
             val resources = ResourceRequirementsBuilder().apply {
                 limits.forEach { (k, v) -> addToLimits(k, v) }
@@ -276,10 +280,20 @@ class K8sRuntimeProvider(
         val podName = podNames.remove(instanceId) ?: return
         val k8s = client ?: return
         try {
-            k8s.pods().inNamespace(config.namespace).withName(podName).withTimeoutInMillis(30.seconds.inWholeMilliseconds).delete()
+            // Try graceful delete first with short timeout
+            k8s.pods().inNamespace(config.namespace).withName(podName)
+                .withTimeoutInMillis(60.seconds.inWholeMilliseconds).delete()
             log("Stopped K8s pod '$podName' for instance $instanceId")
         } catch (e: Exception) {
-            log("Failed to stop K8s pod '$podName' for instance $instanceId: ${e.message}", LogLevel.ERROR)
+            // Pod stuck in Terminating — force delete
+            log("Pod '$podName' didn't terminate gracefully, force deleting...", LogLevel.WARNING)
+            try {
+                k8s.pods().inNamespace(config.namespace).withName(podName)
+                    .withGracePeriod(0).delete()
+                log("Force stopped K8s pod '$podName' for instance $instanceId")
+            } catch (e2: Exception) {
+                log("Failed to stop K8s pod '$podName' for instance $instanceId: ${e2.message}", LogLevel.ERROR)
+            }
         }
     }
 
@@ -289,12 +303,15 @@ class K8sRuntimeProvider(
         val k8s = client ?: return
 
         try {
-            val out = ByteArrayOutputStream()
-            val err = ByteArrayOutputStream()
+            val commandBytes = (command + "\n").toByteArray()
+            val inputStream = java.io.ByteArrayInputStream(commandBytes)
+
             k8s.pods().inNamespace(config.namespace).withName(podName)
-                .writingOutput(out)
-                .writingError(err)
-                .exec(command)
+                .readingInput(inputStream)
+                .withTTY()
+                .attach()
+                .use { Thread.sleep(500) }
+
             log("Executed command in K8s pod '$podName' for instance $instanceId: $command")
         } catch (e: Exception) {
             log("Failed to execute command in K8s pod '$podName' for instance $instanceId: ${e.message}", LogLevel.ERROR)
