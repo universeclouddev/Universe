@@ -245,7 +245,7 @@ class ManagementCommands @Inject constructor(
         }
     }
 
-    @Command("instance|instances execute|exec <id> <command>")
+    @Command("instance|instances execute|exec|run|cmd|command <id> <command>")
     fun instanceExecute(
         source: CommandSource,
         @Argument("id") instanceId: String,
