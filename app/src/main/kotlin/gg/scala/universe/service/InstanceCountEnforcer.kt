@@ -27,6 +27,9 @@ class InstanceCountEnforcer @Inject constructor(
         Thread(r, "universe-instance-enforcer").apply { isDaemon = true }
     }
 
+    @Volatile
+    private var shuttingDown = false
+
     fun start() {
         if (!configuration.isMasterNode) {
             log("InstanceCountEnforcer disabled on non-master node", LogLevel.INFO)
@@ -43,6 +46,7 @@ class InstanceCountEnforcer @Inject constructor(
     }
 
     fun stop() {
+        shuttingDown = true
         executor.shutdown()
         try {
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -54,6 +58,7 @@ class InstanceCountEnforcer @Inject constructor(
     }
 
     private fun enforce() {
+        if (shuttingDown) return
         try {
             val configs = clusterStateService.configurations.values
             val allInstances = clusterStateService.getAllInstances()

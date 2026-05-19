@@ -108,6 +108,13 @@ class UniverseApplication {
                 val autoUpdater = injector.getInstance(AutoUpdaterService::class.java)
                 autoUpdater.stop()
 
+                // Stop the instance enforcer BEFORE stopping instances so it doesn't
+                // see the count drop below minimum and auto-spawn new ones.
+                if (mainConfiguration.isMasterNode) {
+                    val enforcer = injector.getInstance(InstanceCountEnforcer::class.java)
+                    enforcer.stop()
+                }
+
                 // Stop local instances (needs Hazelcast)
                 println("  ${Ansi.BLUE}→${Ansi.RESET} Stopping local instances...")
                 val nodeShutdownService = injector.getInstance(NodeShutdownService::class.java)
