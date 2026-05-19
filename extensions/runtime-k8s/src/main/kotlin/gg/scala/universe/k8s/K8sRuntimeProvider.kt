@@ -147,10 +147,10 @@ class K8sRuntimeProvider(
             val limits = java.util.HashMap<String, Quantity>()
             val requests = java.util.HashMap<String, Quantity>()
             if (ramMB > 0) {
-                val q = Quantity("${ramMB}Mi")
+                val q = Quantity("${ramMB}M")
                 limits["memory"] = q
                 requests["memory"] = q
-                log("K8s pod '$podName' memory limit: ${ramMB}Mi")
+                log("K8s pod '$podName' memory limit: ${ramMB}M")
             }
             if (cpu > 0) {
                 // cpu units: 100 = 1 core. K8s uses millicores (1000m = 1 core)
