@@ -1,8 +1,28 @@
 openapi: 3.0.3
 info:
   title: Universe API
-  description: REST API for the Universe orchestrator.
+  description: |
+    REST and WebSocket API for the Universe orchestrator.
+    
+    ## Authentication
+    The API uses Bearer token authentication. Include your token in the `Authorization` header:
+    ```
+    Authorization: Bearer YOUR_API_KEY
+    ```
+    
+    ## Permissions
+    - **ALL** — Full access to all endpoints (admin, instance management, config changes)
+    - **PUBLIC** — Read-only access to public endpoints (instance info, logs, live-log)
+    
+    ## Rate Limiting
+    Public API keys are rate-limited (default: 100 calls per 60 seconds). 
+    Admin keys (ALL permission) bypass rate limits entirely.
+    
+    ## WebSocket Endpoints
+    WebSocket connections require the same `Authorization: Bearer TOKEN` header during the handshake.
   version: 1.0.0
+  contact:
+    name: Universe Team
 servers:
   - url: http://localhost:8080/api
     description: Local development server
@@ -10,7 +30,9 @@ paths:
   /ping:
     get:
       summary: Health check
+      description: Returns basic status information about the Universe node.
       operationId: ping
+      security: []
       responses:
         '200':
           description: Universe is running
@@ -22,38 +44,113 @@ paths:
                   status:
                     type: string
                     example: ok
+                  nodeId:
+                    type: string
+                    example: node-1
+                  clusterName:
+                    type: string
+                    example: universe-cluster
+                  master:
+                    type: boolean
+                    example: true
+
   /node:
     get:
       summary: Get current node information
+      description: Returns system statistics and uptime for the current node.
       operationId: getNode
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Node details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodeId:
+                    type: string
+                  uptime:
+                    type: string
+                  systemStats:
+                    type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /node/config:
     get:
       summary: Get current node configuration
+      description: Returns the current node's main configuration ( UniverseMainConfiguration).
       operationId: getNodeConfig
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Node configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UniverseMainConfiguration'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /node/reload:
     post:
       summary: Reload node configuration
+      description: Reloads the node configuration from disk. (Not fully implemented.)
       operationId: reloadNodeConfig
+      security:
+        - bearerAuth: []
       responses:
-        '200':
-          description: Configuration reloaded
+        '501':
+          description: Not Implemented
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Not Implemented
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /cluster/nodes:
     get:
       summary: List all cluster nodes
+      description: Returns a list of all nodes in the Hazelcast cluster.
       operationId: listNodes
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: List of nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    nodeId:
+                      type: string
+                    address:
+                      type: string
+                    master:
+                      type: boolean
+                    resources:
+                      $ref: '#/components/schemas/NodeResources'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /cluster/nodes/{id}:
     get:
       summary: Get a specific node
+      description: Returns detailed information about a cluster node, including its instances.
       operationId: getNodeById
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -63,9 +160,35 @@ paths:
       responses:
         '200':
           description: Node details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodeId:
+                    type: string
+                  address:
+                    type: string
+                  master:
+                    type: boolean
+                  instances:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InstanceInfo'
+                  resources:
+                    $ref: '#/components/schemas/NodeResources'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
     post:
       summary: Execute a command on a node
+      description: |
+        Executes a console command on the specified node.
+        - If `id` is the current node: runs locally (not yet implemented)
+        - If `id` is a remote node: dispatches via Hazelcast (not yet implemented)
       operationId: executeNodeCommand
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -77,23 +200,73 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                command:
-                  type: string
+              $ref: '#/components/schemas/ClusterCommandRequest'
       responses:
-        '200':
-          description: Command output
+        '400':
+          description: Cannot execute command on local node via API
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Cannot execute command on local node via API
+        '501':
+          description: Remote node command execution not yet implemented
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /instances:
     get:
       summary: List all instances
+      description: Returns all instances across the cluster (active and stopped).
       operationId: listInstances
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: List of instances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InstanceInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      summary: Create a new instance
+      description: Deploys a new instance using the specified configuration.
+      operationId: createInstance
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInstanceRequest'
+      responses:
+        '201':
+          description: Instance created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceInfo'
+        '400':
+          description: Invalid configuration name
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /instances/{id}:
     get:
       summary: Get instance details
+      description: |
+        Returns detailed information about an instance.
+        
+        **Public Access**: This endpoint is accessible with PUBLIC permission keys.
       operationId: getInstance
       parameters:
         - name: id
@@ -101,12 +274,26 @@ paths:
           required: true
           schema:
             type: string
+            minLength: 6
+            maxLength: 6
       responses:
         '200':
           description: Instance details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
     delete:
-      summary: Delete an instance
+      summary: Stop and delete an instance
+      description: Stops the instance and removes it from the cluster.
       operationId: deleteInstance
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -114,11 +301,28 @@ paths:
           schema:
             type: string
       responses:
-        '204':
-          description: Instance deleted
+        '200':
+          description: Instance stopped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Instance stopped
+                  instanceId:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /instances/{id}/logs:
     get:
       summary: Get instance logs
+      description: |
+        Returns the most recent log lines for an instance.
+        
+        **Public Access**: This endpoint is accessible with PUBLIC permission keys.
       operationId: getInstanceLogs
       parameters:
         - name: id
@@ -128,16 +332,103 @@ paths:
             type: string
         - name: lines
           in: query
+          description: Number of log lines to return
           schema:
             type: integer
             default: 100
+            minimum: 1
+            maximum: 1000
       responses:
         '200':
           description: Log lines
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lines:
+                    type: array
+                    items:
+                      type: string
+                  totalLines:
+                    type: integer
+                  instanceId:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /instances/{id}/live-log:
+    get:
+      summary: Live log stream (WebSocket)
+      description: |
+        Opens a WebSocket connection that streams live log output from the instance.
+        
+        **Public Access**: This endpoint is accessible with PUBLIC permission keys.
+        
+        Connect with:
+        ```
+        ws://host/api/instances/{id}/live-log
+        Authorization: Bearer YOUR_TOKEN
+        ```
+        
+        Messages are sent as text frames.
+      operationId: liveLog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '101':
+          description: WebSocket connection established
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /instances/{id}/state:
+    put:
+      summary: Update instance state
+      description: Updates the state and/or heartbeat timestamp of an instance.
+      operationId: updateInstanceState
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStateRequest'
+      responses:
+        '200':
+          description: State updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /instances/{id}/lifecycle:
     patch:
-      summary: Change instance lifecycle state
+      summary: Change instance lifecycle
+      description: |
+        Controls the lifecycle of an instance:
+        - `start` — Start a stopped instance
+        - `stop` — Stop a running instance
+        - `restart` — Restart the instance
       operationId: patchInstanceLifecycle
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -147,16 +438,41 @@ paths:
         - name: target
           in: query
           required: true
+          description: Target lifecycle state
           schema:
             type: string
-            enum: [start, stop, restart]
+            enum:
+              - start
+              - stop
+              - restart
       responses:
         '200':
           description: Lifecycle changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  instanceId:
+                    type: string
+                  target:
+                    type: string
+        '400':
+          description: Invalid target state or instance not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /instances/{id}/execute:
     post:
-      summary: Execute a command in an instance
+      summary: Execute a command on an instance
+      description: |
+        Sends a command to the instance's stdin. The command is piped directly
+        to the running process (e.g., Minecraft console).
       operationId: executeInstanceCommand
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -168,24 +484,51 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                command:
-                  type: string
+              $ref: '#/components/schemas/ExecuteOnInstanceRequest'
       responses:
         '200':
-          description: Command executed
+          description: Command dispatched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Command dispatched
+                  instanceId:
+                    type: string
+                  command:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /configurations:
     get:
       summary: List all configurations
+      description: Returns all instance configurations.
       operationId: listConfigurations
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: List of configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Configuration'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /configurations/{name}:
     get:
       summary: Get a configuration
+      description: Returns a specific configuration by name.
       operationId: getConfiguration
+      security:
+        - bearerAuth: []
       parameters:
         - name: name
           in: path
@@ -195,9 +538,21 @@ paths:
       responses:
         '200':
           description: Configuration details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuration'
+        '404':
+          description: Configuration not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
     put:
       summary: Create or update a configuration
+      description: Creates or updates an instance configuration.
       operationId: putConfiguration
+      security:
+        - bearerAuth: []
       parameters:
         - name: name
           in: path
@@ -209,13 +564,19 @@ paths:
         content:
           application/json:
             schema:
-              type: object
+              $ref: '#/components/schemas/Configuration'
       responses:
-        '200':
+        '204':
           description: Configuration saved
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
     delete:
       summary: Delete a configuration
+      description: Deletes an instance configuration.
       operationId: deleteConfiguration
+      security:
+        - bearerAuth: []
       parameters:
         - name: name
           in: path
@@ -225,17 +586,42 @@ paths:
       responses:
         '204':
           description: Configuration deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /templates:
     get:
       summary: List all templates
+      description: Returns all available templates organized by group.
       operationId: listTemplates
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    group:
+                      type: string
+                    templates:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Template'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /templates/{group}/{name}:
     get:
       summary: Get template details
+      description: Returns details about a specific template.
       operationId: getTemplate
+      security:
+        - bearerAuth: []
       parameters:
         - name: group
           in: path
@@ -250,33 +636,461 @@ paths:
       responses:
         '200':
           description: Template details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  group:
+                    type: string
+                  name:
+                    type: string
+                  path:
+                    type: string
+                  exists:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /templates/sync:
     post:
       summary: Sync templates across cluster
+      description: Dispatches a template sync task to the cluster via Hazelcast.
       operationId: syncTemplates
-      responses:
-        '200':
-          description: Sync initiated
-  /commands/execute:
-    post:
-      summary: Execute a console command
-      operationId: executeCommand
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                command:
-                  type: string
+              $ref: '#/components/schemas/TemplateSyncRequest'
+      responses:
+        '200':
+          description: Sync initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Template sync dispatched
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /commands/execute:
+    post:
+      summary: Execute a console command
+      description: |
+        Executes a command on the Universe master node's console.
+        The command output is captured and returned in the response.
+      operationId: executeCommand
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteCommandRequest'
       responses:
         '200':
           description: Command output
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  command:
+                    type: string
+                  output:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /console:
+    get:
+      summary: Interactive console (WebSocket)
+      description: |
+        Opens an interactive WebSocket console to the Universe master node.
+        
+        Connect with:
+        ```
+        ws://host/api/console
+        Authorization: Bearer YOUR_TOKEN
+        ```
+        
+        Send commands as text frames. Responses are streamed back as text frames.
+      operationId: console
+      security:
+        - bearerAuth: []
+      responses:
+        '101':
+          description: WebSocket connection established
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /metrics:
+    get:
+      summary: Metrics scrape endpoint
+      description: |
+        Returns metrics in Prometheus exposition format.
+        Used by Prometheus or other monitoring systems.
+      operationId: getMetrics
+      security: []
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP universe_instances_total Total number of instances
+                # TYPE universe_instances_total gauge
+                universe_instances_total 5
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-security:
-  - bearerAuth: []
+      description: |
+        API key token. Generate keys via the console command `key create`.
+        
+        **Permission Levels:**
+        - `ALL` — Full admin access to all endpoints
+        - `PUBLIC` — Read-only access to public endpoints
+
+  schemas:
+    InstanceInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique 6-character instance ID
+          example: a1b2c3
+        configurationName:
+          type: string
+          description: Name of the configuration this instance uses
+          example: lobby
+        wrapperNodeId:
+          type: string
+          description: ID of the node hosting this instance
+          example: node-1
+        hostAddress:
+          type: string
+          description: Host address clients should connect to
+          example: 127.0.0.1
+        allocatedPort:
+          type: integer
+          description: Port allocated for this instance
+          example: 25565
+        state:
+          $ref: '#/components/schemas/InstanceState'
+        lastHeartbeat:
+          type: integer
+          format: int64
+          description: Unix timestamp of last heartbeat
+        processPid:
+          type: integer
+          format: int64
+          nullable: true
+          description: Process ID (null for container runtimes)
+        allocatedRamMB:
+          type: integer
+          description: Allocated RAM in MB
+          example: 2048
+        allocatedCpu:
+          type: integer
+          description: Allocated CPU units (100 = 1 core)
+          example: 100
+        runtime:
+          type: string
+          description: Runtime provider used (screen, docker, k8s, etc.)
+          example: docker
+
+    InstanceState:
+      type: string
+      enum:
+        - CREATING
+        - ONLINE
+        - OFFLINE
+        - STOPPED
+      description: |
+        - **CREATING** — Instance is being deployed
+        - **ONLINE** — Instance is running and healthy
+        - **OFFLINE** — Instance has missed heartbeats
+        - **STOPPED** — Instance has been stopped
+
+    Configuration:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Unique configuration name
+          example: lobby
+        runtime:
+          type: string
+          description: Runtime provider key
+          example: docker
+          default: screen
+        command:
+          type: string
+          description: Command to start the instance
+          example: java -Xmx2048M -jar server.jar
+        static:
+          type: boolean
+          description: Whether this is a static (persistent) instance
+          default: false
+        ramMB:
+          type: integer
+          description: RAM allocated in MB
+          example: 2048
+          default: 2048
+        cpu:
+          type: integer
+          description: CPU units (100 = 1 core)
+          example: 100
+          default: 100
+        instanceGroups:
+          type: array
+          items:
+            type: string
+          description: Groups this configuration belongs to
+          example: [lobby]
+        nodes:
+          type: array
+          items:
+            type: string
+          description: Nodes allowed to host this instance
+          example: [node-1]
+        hostAddress:
+          type: string
+          description: Host address for client connections
+          example: 127.0.0.1
+        availablePorts:
+          $ref: '#/components/schemas/PortRange'
+        minimumServiceCount:
+          type: integer
+          description: Minimum number of instances to maintain
+          example: 1
+          default: 1
+        environmentVariables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Environment variables for the instance
+          example:
+            UNIVERSE_INSTANCE_ID: "%INSTANCE_ID%"
+        templateInstallationConfig:
+          $ref: '#/components/schemas/TemplateInstallationConfig'
+        fileModifications:
+          type: array
+          items:
+            type: string
+          description: Files to modify after template installation
+          example: [server.properties]
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+          description: Additional configuration properties
+
+    PortRange:
+      type: object
+      properties:
+        min:
+          type: integer
+          description: Minimum port number
+          example: 25565
+        max:
+          type: integer
+          description: Maximum port number
+          example: 25570
+
+    TemplateInstallationConfig:
+      type: object
+      properties:
+        allOf:
+          type: array
+          items:
+            $ref: '#/components/schemas/Template'
+          description: Templates to install (all required)
+        allInGroups:
+          type: array
+          items:
+            type: string
+          description: Template groups to install entirely
+        oneOf:
+          type: array
+          items:
+            $ref: '#/components/schemas/Template'
+          description: Templates to choose one from
+        oneInGroups:
+          type: array
+          items:
+            type: string
+          description: Template groups to choose one template from
+        onTemplatePasteOverridePresentFiles:
+          type: boolean
+          description: Whether templates override existing files
+          default: false
+
+    Template:
+      type: object
+      properties:
+        name:
+          type: string
+          example: server
+        group:
+          type: string
+          example: default
+        storage:
+          type: string
+          description: Storage backend (local, s3)
+          example: local
+        priority:
+          type: integer
+          description: Installation priority order
+          example: 1
+
+    NodeResources:
+      type: object
+      properties:
+        usedRamMB:
+          type: integer
+          description: Currently used RAM in MB
+        usedCpu:
+          type: integer
+          description: Currently used CPU units
+
+    UniverseMainConfiguration:
+      type: object
+      properties:
+        address:
+          type: string
+          example: 127.0.0.1
+        port:
+          type: integer
+          description: Hazelcast cluster port
+          example: 6000
+        apiPort:
+          type: integer
+          description: REST API port
+          example: 7000
+        nodeId:
+          type: string
+          example: node-1
+        clusterName:
+          type: string
+          example: universe-cluster
+        isMasterNode:
+          type: boolean
+        masterAddress:
+          type: string
+        masterPort:
+          type: integer
+        masterApiPort:
+          type: integer
+        debug:
+          type: boolean
+        maxRamMB:
+          type: integer
+        maxCpu:
+          type: integer
+
+    CreateInstanceRequest:
+      type: object
+      properties:
+        configurationName:
+          type: string
+          description: Name of the configuration to use
+          example: lobby
+      required:
+        - configurationName
+
+    UpdateStateRequest:
+      type: object
+      properties:
+        state:
+          type: string
+          description: New state value
+          enum:
+            - CREATING
+            - ONLINE
+            - OFFLINE
+            - STOPPED
+        lastHeartbeat:
+          type: integer
+          format: int64
+          description: Unix timestamp (optional, resets if not provided)
+      required:
+        - state
+
+    ExecuteOnInstanceRequest:
+      type: object
+      properties:
+        command:
+          type: string
+          description: Command to execute on the instance
+          example: op andyreckt
+      required:
+        - command
+
+    ClusterCommandRequest:
+      type: object
+      properties:
+        command:
+          type: string
+          description: Console command to execute
+          example: instance list
+      required:
+        - command
+
+    TemplateSyncRequest:
+      type: object
+      properties:
+        pattern:
+          type: string
+          description: Template pattern to sync (e.g., default/*, group/name)
+          example: default/*
+      required:
+        - pattern
+
+    ExecuteCommandRequest:
+      type: object
+      properties:
+        command:
+          type: string
+          description: Console command to execute on the master node
+          example: help
+      required:
+        - command
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid Authorization header
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Unauthorized
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Rate limit exceeded. Retry after 45000ms.
+              retryAfterMs:
+                type: integer
+                example: 45000
