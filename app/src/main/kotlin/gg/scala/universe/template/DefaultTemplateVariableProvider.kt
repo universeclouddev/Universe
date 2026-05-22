@@ -31,8 +31,11 @@ class DefaultTemplateVariableProvider @Inject constructor(
             "%NODE_ID%" to mainConfiguration.nodeId,
             "%HOST_ADDRESS%" to configuration.hostAddress,
             "%CONFIGURATION_NAME%" to configuration.name,
+            "%NODE_PORT%" to mainConfiguration.port.toString(),
+            "%NODE_ADDRESS%" to mainConfiguration.address,
         )
 
+        mainConfiguration.nodeSpecificVariables.forEach { (key, value) -> result["%$key%"] = value  }
         configuration.properties.forEach { (key, value) -> result["%$key%"] = value }
         return result
     }

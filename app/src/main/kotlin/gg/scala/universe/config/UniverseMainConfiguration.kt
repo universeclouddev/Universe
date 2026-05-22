@@ -20,5 +20,6 @@ data class UniverseMainConfiguration(
     val maxCpu: Int = 400,
 
     /** Auto-update sources for configurations and templates. */
-    val updateSources: List<UpdateSource> = emptyList()
+    val updateSources: List<UpdateSource> = emptyList(),
+    val nodeSpecificVariables: Map<String, String> = mutableMapOf("region" to "us-east-1"),
 )
