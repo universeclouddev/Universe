@@ -33,8 +33,8 @@ data class DockerConfig(
     val registryUrl: String? = null,
     val user: String? = null,
     val containerWorkDir: String = "/app",
-    val autoRemove: Boolean = false,
-    val stopTimeout: Int = 10,
+    val autoRemove: Boolean = true,
+    val stopTimeout: Int = 30,
     /**
      * Host filesystem path that corresponds to the Universe data directory.
      * Required when Universe itself runs inside a Docker container, because

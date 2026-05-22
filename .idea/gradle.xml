@@ -29,6 +29,7 @@
             <option value="$PROJECT_DIR$/extensions/db-mongodb" />
             <option value="$PROJECT_DIR$/extensions/db-postgres" />
             <option value="$PROJECT_DIR$/extensions/db-redis" />
+            <option value="$PROJECT_DIR$/extensions/discord" />
             <option value="$PROJECT_DIR$/extensions/example" />
             <option value="$PROJECT_DIR$/extensions/gitops" />
             <option value="$PROJECT_DIR$/extensions/metrics-influxdb" />
@@ -39,6 +40,8 @@
             <option value="$PROJECT_DIR$/loader" />
             <option value="$PROJECT_DIR$/minecraft" />
             <option value="$PROJECT_DIR$/minecraft/api" />
+            <option value="$PROJECT_DIR$/minecraft/bungee" />
+            <option value="$PROJECT_DIR$/minecraft/folia" />
             <option value="$PROJECT_DIR$/minecraft/legacy" />
             <option value="$PROJECT_DIR$/minecraft/modern" />
             <option value="$PROJECT_DIR$/minecraft/velocity" />

@@ -74,7 +74,7 @@ object ConfigurationLoader {
         return Configuration(
             name = "lobby",
             runtime = "screen",
-            command = "java -jar server.jar",
+            command = "java -XX:MaxRAMPercentage=90.0 -XX:InitialRAMPercentage=75.0 -jar server.jar",
             static = false,
             instanceGroups = listOf("lobby"),
             nodes = listOf("node-1"),

@@ -62,8 +62,8 @@ Now when Universe creates a container and bind-mounts the working directory, the
   },
   "volumes": [],
   "exposedPorts": [],
-  "autoRemove": false,
-  "stopTimeout": 10
+  "autoRemove": true,
+  "stopTimeout": 30
 }
 ```
 
