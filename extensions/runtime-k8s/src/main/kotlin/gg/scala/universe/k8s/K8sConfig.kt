@@ -58,7 +58,46 @@ data class K8sConfig(
      * S3 prefix override for template keys. If null, uses the S3
      * extension's configured prefix (defaults to `templates/`).
      */
-    val s3Prefix: String? = null
+    val s3Prefix: String? = null,
+
+    /**
+     * Service configuration for per-instance Kubernetes Services.
+     * When enabled, a Service is created alongside each Pod to provide
+     * stable DNS resolution and in-cluster connectivity.
+     */
+    val service: K8sServiceConfig = K8sServiceConfig()
+)
+
+/**
+ * Configuration for per-instance Kubernetes Services created by the K8s runtime.
+ */
+data class K8sServiceConfig(
+    /** Whether to create a Service for each instance. */
+    val enabled: Boolean = true,
+
+    /** Service type. Defaults to ClusterIP; use NodePort or LoadBalancer for external access. */
+    val type: String = "ClusterIP",
+
+    /** When null, K8s assigns an IP. Set to "None" for headless (DNS-only) services. */
+    val clusterIP: String? = "None",
+
+    /** Extra labels merged into the Service metadata. */
+    val labels: Map<String, String> = emptyMap(),
+
+    /** Extra annotations merged into the Service metadata. */
+    val annotations: Map<String, String> = emptyMap(),
+
+    /**
+     * Whether to set the Pod as the Service's ownerReference so K8s
+     * garbage-collects the Service when the Pod is deleted.
+     */
+    val ownerReference: Boolean = true,
+
+    /**
+     * Whether to clean up orphaned services (services without a matching pod)
+     * when the K8s runtime provider initializes.
+     */
+    val cleanupOrphans: Boolean = true
 )
 
 data class K8sTolerationConfig(

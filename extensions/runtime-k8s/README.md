@@ -34,6 +34,62 @@ This extension allows Universe to spawn instances as **Kubernetes Pods** instead
 
 For cloud mode, see [CLOUD.md](CLOUD.md) for one-command deployment with S3 templates.
 
+## Per-Instance Services
+
+By default, the K8s extension creates a **headless Service** per pod for in-cluster DNS resolution. This is controlled by the `service` config block:
+
+```json
+{
+  "service": {
+    "enabled": true,
+    "type": "ClusterIP",
+    "clusterIP": "None",
+    "labels": {},
+    "annotations": {},
+    "ownerReference": true,
+    "cleanupOrphans": true
+  }
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `enabled` | `true` | Whether to create a Service alongside each Pod |
+| `type` | `"ClusterIP"` | Service type. Use `NodePort` or `LoadBalancer` for external access |
+| `clusterIP` | `"None"` | `"None"` = headless (DNS only). `null` = auto-assign virtual IP |
+| `labels` | `{}` | Extra labels merged into Service metadata |
+| `annotations` | `{}` | Extra annotations (e.g. for external-dns or cloud LB config) |
+| `ownerReference` | `true` | Service is auto-deleted when the Pod is deleted |
+| `cleanupOrphans` | `true` | On startup, delete Services whose Pods no longer exist |
+
+### Headless service (default)
+
+Each instance gets a DNS name:
+```
+universe-<instanceId>.<namespace>.svc.cluster.local
+```
+
+This is used by the Velocity proxy for in-cluster pod-to-pod connectivity.
+
+### Disable services
+
+If you use Tailscale or host networking instead:
+```json
+{ "service": { "enabled": false } }
+```
+
+### NodePort for external access
+
+```json
+{
+  "service": {
+    "enabled": true,
+    "type": "NodePort",
+    "clusterIP": null
+  }
+}
+```
+
 ## End-User Experience (Cloud + S3)
 
 1. Enable the **S3 storage extension** — configure `./extensions/s3/config.json` with your bucket/region

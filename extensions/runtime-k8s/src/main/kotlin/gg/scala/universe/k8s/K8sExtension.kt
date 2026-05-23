@@ -5,6 +5,7 @@ import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.extension.Extension
 import gg.scala.universe.runtime.RuntimeRegistry
+import gg.scala.universe.template.TemplateVariableRegistry
 
 class K8sExtension : Extension {
 
@@ -14,12 +15,19 @@ class K8sExtension : Extension {
     @Inject
     private lateinit var runtimeRegistry: RuntimeRegistry
 
+    @Inject
+    private lateinit var templateVariableRegistry: TemplateVariableRegistry
+
     private lateinit var config: K8sConfig
 
     override fun onLoad() {
         config = K8sConfigLoader.load()
         val provider = K8sRuntimeProvider(config)
         runtimeRegistry.register(config.factoryName, provider)
+        
+        // Register K8s-specific template variables (%NAMESPACE%, %SERVICE_DNS%, etc.)
+        templateVariableRegistry.register(K8sTemplateVariableProvider(config))
+        
         log("Kubernetes runtime extension loaded (image=${config.image}, namespace=${config.namespace})", LogLevel.SUCCESS)
     }
 

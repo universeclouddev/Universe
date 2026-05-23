@@ -47,6 +47,9 @@ class K8sRuntimeProvider(
         try {
             client = createKubernetesClient()
             log("Connected to Kubernetes cluster", LogLevel.SUCCESS)
+
+            // Clean up orphaned services from previous crashes
+            client?.let { cleanupOrphanedServices(it, config.namespace, config.service) }
         } catch (e: Exception) {
             log("Failed to connect to Kubernetes cluster: ${e.message}. K8s runtime will be unavailable.", LogLevel.WARNING)
         }
@@ -65,7 +68,7 @@ class K8sRuntimeProvider(
         command: String,
         ramMB: Int,
         cpu: Int,
-        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?,
+        configuration: gg.scala.universe.schema.Configuration,
         environmentVariables: Map<String, String>?
     ): ProcessHandle {
         val k8s = requireClient()
@@ -77,7 +80,8 @@ class K8sRuntimeProvider(
 
         val labels = mutableMapOf(
             "app" to "universe",
-            "universe-instance-id" to instanceId
+            "universe-instance-id" to instanceId,
+            "configuration" to configuration.name
         )
         labels.putAll(config.labels)
 
@@ -193,7 +197,7 @@ class K8sRuntimeProvider(
         val container = containerBuilder.build()
 
         // Build init containers for S3 template download in cloud mode
-        val initContainers = buildS3InitContainers(templateConfig, workVolumeName, workVolume)
+        val initContainers = buildS3InitContainers(configuration.templateInstallationConfig, workVolumeName, workVolume)
 
         val volumes = config.volumes.map { vol ->
             VolumeBuilder().withName(vol.name).apply {
@@ -255,6 +259,9 @@ class K8sRuntimeProvider(
         val pod = k8s.resource(podBuilder.build()).create()
         podNames[instanceId] = podName
 
+        // Create Service for in-cluster connectivity (DNS / routing)
+        createInstanceService(k8s, config.service, namespace, podName, instanceId, port, labels, pod.metadata.uid)
+
         // Wait for pod to be running
         val started = waitForPodPhase(k8s, namespace, podName, "Running", config.timeoutSeconds)
         if (!started) {
@@ -280,7 +287,7 @@ class K8sRuntimeProvider(
         val podName = podNames.remove(instanceId) ?: return
         val k8s = client ?: return
         try {
-            // Try graceful delete first with short timeout
+            // Delete pod first (this will also delete the service via ownerReference)
             k8s.pods().inNamespace(config.namespace).withName(podName)
                 .withTimeoutInMillis(60.seconds.inWholeMilliseconds).delete()
             log("Stopped K8s pod '$podName' for instance $instanceId")
@@ -294,6 +301,26 @@ class K8sRuntimeProvider(
             } catch (e2: Exception) {
                 log("Failed to stop K8s pod '$podName' for instance $instanceId: ${e2.message}", LogLevel.ERROR)
             }
+        }
+
+        // Fallback: manually delete the service if ownerReference didn't work
+        try {
+            val serviceName = "universe-$instanceId"
+            k8s.services().inNamespace(config.namespace).withName(serviceName).delete()
+            log("Deleted service '$serviceName' for instance $instanceId")
+        } catch (_: Exception) {
+            // Service may already be deleted by ownerReference
+        }
+    }
+
+    override fun getHostAddress(instanceId: String): String {
+        val podName = podNames[instanceId] ?: return ""
+        val k8s = client ?: return ""
+        return try {
+            k8s.pods().inNamespace(config.namespace).withName(podName).get()
+                ?.status?.podIP ?: ""
+        } catch (_: Exception) {
+            ""
         }
     }
 
