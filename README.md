@@ -6,10 +6,12 @@ A single-JAR orchestrator for deploying and managing application instances acros
 
 - **Master/Wrapper Cluster** — One Master node exposes a REST API; any number of Wrapper nodes execute instances via Hazelcast task dispatch.
 - **Template-Based Deployment** — Instances are created from templates (file trees) with dynamic variable replacement.
-- **Pluggable Runtimes** — Built-in `screen` and `tmux` runtimes; Docker support via extension.
+- **Pluggable Runtimes** — Built-in `screen` and `tmux` runtimes; Docker and Kubernetes support via extensions.
 - **Remote Template Storage** — S3-backed template storage extension for centralized template management.
+- **Mesh Networking** — Tailscale extension exposes mesh-network IPs as template variables for cross-node connectivity.
 - **Console & REST Commands** — Full command system accessible via console or HTTP API.
 - **Single Fat JAR** — Master and Wrapper run from the same JAR; node type is determined by configuration.
+- **GitOps & ArgoCD** — Sync templates from Git; export Kubernetes manifests for ArgoCD tracking.
 
 ## Architecture
 
@@ -62,12 +64,23 @@ Artifacts are copied to `.built/` after build.
 | `extensions/extension-api` | Extension-facing interfaces (`Extension`, `TemplateStorageProvider`, etc.) |
 | `extensions/runtime-docker` | Docker container runtime provider |
 | `extensions/runtime-k8s` | Kubernetes Pod runtime provider |
+| `extensions/tailscale` | Tailscale mesh-network IP template variables |
 | `extensions/storage-s3` | AWS S3 template storage backend |
+| `extensions/db-postgres` | PostgreSQL database provider |
+| `extensions/db-mongodb` | MongoDB database provider |
+| `extensions/db-redis` | Redis database provider |
+| `extensions/metrics-prometheus` | Prometheus metrics export |
+| `extensions/metrics-influxdb` | InfluxDB metrics export |
+| `extensions/gitops` | Git-based template and config sync |
+| `extensions/argocd` | ArgoCD manifest exporter |
+| `extensions/discord` | Discord bot for cluster management |
 | `extensions/example` | Reference extension implementation |
 | `minecraft/minecraft-api` | JVM 8 compatible public API for Minecraft plugin developers |
 | `minecraft/minecraft-modern` | Paper 1.21.11+ plugin with MiniMessage support |
 | `minecraft/minecraft-legacy` | Spigot 1.8.8 plugin with legacy color codes |
 | `minecraft/minecraft-velocity` | Velocity 3.5.0 proxy plugin |
+| `minecraft/minecraft-bungee` | BungeeCord proxy plugin |
+| `minecraft/minecraft-folia` | Folia 1.21+ plugin |
 
 ## Running
 
@@ -102,6 +115,27 @@ On first run, the following files/directories are created:
   "masterApiPort": 7000
 }
 ```
+
+**`./database.json`** (database config):
+```json
+{
+  "provider": "h2",
+  "url": "universe.db",
+  "host": "localhost",
+  "port": 3306,
+  "database": "universe",
+  "username": "sa",
+  "password": ""
+}
+```
+
+| Provider | Key | Notes |
+|----------|-----|-------|
+| H2 (embedded) | `h2` | Default, zero setup, file-based |
+| MySQL | `mysql` | Built-in, requires running MySQL server |
+| PostgreSQL | `postgres` | Via `extension-db-postgres` |
+| MongoDB | `mongodb` | Via `extension-db-mongodb` |
+| Redis | `redis` | Via `extension-db-redis` |
 
 **`./configuration/default.json`** (instance config):
 ```json
@@ -290,9 +324,12 @@ When an instance is created, `TemplateManager`:
    - `%MASTER_PORT%` — master Hazelcast port
    - `%MASTER_API_PORT%` — master REST API port
    - `%NODE_ID%` — local node ID
-   - `%HOST_ADDRESS%` — local host address
+   - `%HOST_ADDRESS%` — local host address (or runtime-specific override)
    - `%CONFIGURATION_NAME%` — configuration name
-5. Replaces custom variables from `Configuration.properties`:
+5. Replaces extension-provided variables:
+   - **K8s runtime**: `%NAMESPACE%`, `%SERVICE_DNS%`, `%POD_NAME%`
+   - **Tailscale**: `%TAILSCALE_IP%`, `%TAILSCALE_MAGIC_DNS%`, `%TAILSCALE_HOSTNAME%`
+6. Replaces custom variables from `Configuration.properties`:
    - Each entry `{ "myKey": "myValue" }` becomes `%myKey%` → `myValue`
 
 **Template sync between nodes:**
@@ -306,9 +343,29 @@ template sync * node-2            # sync all templates
 
 Extensions are self-registering JARs placed in `./extensions/`.
 
-**Built-in extensions:**
+**Runtime extensions:**
 - `runtime-docker` — Docker container runtime
+- `runtime-k8s` — Kubernetes Pod runtime
+- `tailscale` — Mesh-network IP template variables
+
+**Storage extensions:**
 - `storage-s3` — AWS S3 template storage
+
+**Database extensions:**
+- `db-postgres` — PostgreSQL database provider
+- `db-mongodb` — MongoDB database provider
+- `db-redis` — Redis database provider
+
+**Metrics extensions:**
+- `metrics-prometheus` — Prometheus metrics export (`/api/metrics`)
+- `metrics-influxdb` — InfluxDB metrics export
+
+**DevOps extensions:**
+- `gitops` — Sync templates and configs from Git
+- `argocd` — Export Kubernetes manifests for ArgoCD
+
+**Integration extensions:**
+- `discord` — Discord bot for cluster management
 
 **Extension structure:**
 ```kotlin
@@ -371,6 +428,19 @@ api.instanceManager.getInstances().thenAccept { instances ->
 - Uses MiniMessage via same `CC.kt` pattern as modern
 - Polls instances from Master REST API and auto-registers them as Velocity servers
 - Commands: `/universe info`, `/universe send <player> <server>`
+- Auto-connect on player join with configurable strategies (`LEAST_POPULATED`, `MOST_POPULATED`, `RANDOM`)
+
+### BungeeCord Proxy Plugin (`minecraft-bungee`)
+
+- Targets BungeeCord (legacy proxy support)
+- Uses legacy `&` color codes
+- Same auto-connect and instance polling as Velocity
+
+### Folia Plugin (`minecraft-folia`)
+
+- Targets Folia 1.21+ (regionized tick scheduling)
+- Same command set as modern Paper plugin
+- Adapts to Folia's async entity API
 
 ### Plugin Master URL Configuration
 
@@ -407,7 +477,41 @@ If the Minecraft server runs in a container or pod and the Master is on a differ
 
 Shadow JARs are output to `.built/`.
 
-## Development
+## Networking
+
+### Port Allocation
+
+Universe's `PortAllocator` checks three sources before assigning a port:
+
+1. **Local in-memory allocations** — ports already assigned by this JVM instance
+2. **Cluster-wide active instances** — queries Hazelcast for all `ONLINE`/`CREATING` instances and skips their ports
+3. **OS-level availability** — attempts a `ServerSocket` bind + TCP connect probe to catch services already listening on the machine
+
+This prevents port conflicts even when multiple configurations share overlapping ranges or when external services occupy ports.
+
+### Cross-Node Connectivity
+
+By default, instances advertise `hostAddress` from their configuration. For nodes on different networks, use:
+
+- **Tailscale extension** — set `hostAddress: "%TAILSCALE_IP%"` for encrypted mesh-network connectivity
+- **K8s headless Services** — in-cluster DNS: `universe-<id>.<namespace>.svc.cluster.local`
+- **Public IP / NodePort** — configure `hostAddress` to the node's public IP and use K8s `NodePort` services
+
+### Proxy Auto-Connect
+
+The Velocity and BungeeCord plugins automatically connect players to backend instances on join. Strategies:
+
+| Strategy | Behavior |
+|----------|----------|
+| `LEAST_POPULATED` | Send player to the instance with the fewest players |
+| `MOST_POPULATED` | Send player to the instance with the most players (e.g. for minigame lobbies) |
+| `RANDOM` | Pick a random instance |
+
+Configure in `plugins/Universe/config.yml`:
+```yaml
+auto-connect: true
+auto-connect-strategy: LEAST_POPULATED
+```
 
 ### Adding a new runtime extension
 
