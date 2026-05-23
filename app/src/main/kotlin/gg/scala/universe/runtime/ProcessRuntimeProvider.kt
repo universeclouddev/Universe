@@ -25,7 +25,7 @@ class ProcessRuntimeProvider : RuntimeProvider {
         command: String,
         ramMB: Int,
         cpu: Int,
-        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?,
+        configuration: gg.scala.universe.schema.Configuration,
         environmentVariables: Map<String, String>?
     ): ProcessHandle {
         if (command.isBlank()) {

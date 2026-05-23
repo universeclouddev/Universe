@@ -1,6 +1,6 @@
 package gg.scala.universe.runtime
 
-import gg.scala.universe.schema.TemplateInstallationConfig
+import gg.scala.universe.schema.Configuration
 import java.nio.file.Path
 
 /**
@@ -19,8 +19,8 @@ interface RuntimeProvider {
      * @param command The command string to execute.
      * @param ramMB Maximum RAM the instance may use (in megabytes). Zero means unlimited.
      * @param cpu Maximum CPU units the instance may use. Zero means unlimited.
-     * @param templateConfig Optional template installation config. Runtimes that support
-     *        init containers (e.g., K8s) can use this to pre-populate the working directory.
+     * @param configuration The full instance configuration. Runtimes can access
+     *        fileModifications, properties, template configs, etc.
      * @param environmentVariables Optional environment variables to set for the process.
      *        Values may contain template placeholders that have already been replaced.
      * @return A [ProcessHandle] representing the started process.
@@ -32,7 +32,7 @@ interface RuntimeProvider {
         command: String,
         ramMB: Int,
         cpu: Int,
-        templateConfig: TemplateInstallationConfig? = null,
+        configuration: Configuration,
         environmentVariables: Map<String, String>? = null
     ): ProcessHandle
 
@@ -64,4 +64,12 @@ interface RuntimeProvider {
      * Used for instance recovery after node restart.
      */
     fun listRunningInstances(): List<String> = emptyList()
+    /**
+     * Returns the reachable host address for the given instance.
+     * Used by the proxy (or other services) to connect to this instance.
+     *
+     * @param instanceId Unique 6-character identifier for the instance.
+     * @return The host address (IP or DNS name), or empty string if not applicable.
+     */
+    fun getHostAddress(instanceId: String): String = ""
 }

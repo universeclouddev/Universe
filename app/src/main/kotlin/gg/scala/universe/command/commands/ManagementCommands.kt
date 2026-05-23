@@ -26,6 +26,7 @@ import org.incendo.cloud.annotation.specifier.FlagYielding
 import com.hazelcast.core.HazelcastInstance
 import gg.scala.universe.hz.nodeName
 import kotlinx.coroutines.delay
+import org.incendo.cloud.annotations.Default
 import java.nio.file.Path
 import java.nio.file.Files
 import kotlin.io.path.exists
@@ -142,7 +143,7 @@ class ManagementCommands @Inject constructor(
     fun instanceCreate(
         source: CommandSource,
         @Argument("config") configName: String,
-        @Argument("amount") amount: Int = 1
+        @Argument("amount") @Default("1") amount: Int = 1
     ) {
         val configuration = clusterStateService.getConfiguration(configName)
         if (configuration == null) {

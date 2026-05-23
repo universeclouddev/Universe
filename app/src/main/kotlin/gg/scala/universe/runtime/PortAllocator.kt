@@ -4,8 +4,12 @@ import com.google.inject.Inject
 import com.google.inject.Singleton
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
+import gg.scala.universe.hz.ClusterStateService
+import gg.scala.universe.schema.InstanceState
 import gg.scala.universe.schema.PortRange
+import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.net.Socket
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -13,28 +17,60 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Ports are tracked in-memory to avoid allocating the same port twice
  * within the same JVM instance. The actual availability test is performed
- * by attempting to bind a [ServerSocket].
+ * by attempting to bind a [ServerSocket] and, as a secondary check, verifying
+ * no existing service is listening on the port.
+ *
+ * Additionally, the allocator checks against all active instances across the
+ * cluster (via Hazelcast) to avoid conflicts with ports already allocated
+ * to other configurations.
  */
 @Singleton
-class PortAllocator @Inject constructor() {
+class PortAllocator @Inject constructor(
+    private val clusterStateService: ClusterStateService
+) {
 
     private val allocatedPorts = ConcurrentHashMap.newKeySet<Int>()
 
     /**
      * Finds and locks the lowest available port in the given [range].
      *
+     * Checks, in order:
+     * 1. Local in-memory allocations (this JVM)
+     * 2. Active instances cluster-wide (Hazelcast — all configurations)
+     * 3. OS-level port availability (ServerSocket bind + connect probe)
+     *
      * @param range The inclusive min/max port range to scan.
      * @return The allocated port number, or `null` if none are available.
      */
     fun allocate(range: PortRange): Int? {
-        for (port in range.min..range.max) {
-            if (allocatedPorts.contains(port)) continue
+        // Build a snapshot of ports already in use by active instances across the cluster
+        val clusterUsedPorts = clusterStateService.getAllInstances()
+            .filter { it.state == InstanceState.ONLINE || it.state == InstanceState.CREATING }
+            .map { it.allocatedPort }
+            .toSet()
 
-            if (isPortAvailable(port)) {
-                allocatedPorts.add(port)
-                log("Allocated port $port (range ${range.min}-${range.max})")
-                return port
+        for (port in range.min..range.max) {
+            // 1. Check local in-memory allocations
+            if (allocatedPorts.contains(port)) {
+                log("Port $port skipped — already allocated locally", LogLevel.DEBUG)
+                continue
             }
+
+            // 2. Check cluster-wide active instances (all configurations)
+            if (port in clusterUsedPorts) {
+                log("Port $port skipped — in use by another instance in the cluster", LogLevel.DEBUG)
+                continue
+            }
+
+            // 3. OS-level availability check
+            if (!isPortAvailable(port)) {
+                log("Port $port skipped — bound by another process on this machine", LogLevel.DEBUG)
+                continue
+            }
+
+            allocatedPorts.add(port)
+            log("Allocated port $port (range ${range.min}-${range.max})")
+            return port
         }
 
         log("No available ports in range ${range.min}-${range.max}", LogLevel.ERROR)
@@ -59,11 +95,42 @@ class PortAllocator @Inject constructor() {
         log("Reserved port $port (recovered)")
     }
 
+    /**
+     * Returns the set of ports currently allocated in this JVM.
+     */
+    fun getLocalAllocations(): Set<Int> = allocatedPorts.toSet()
+
+    /**
+     * Checks OS-level port availability using two strategies:
+     *
+     * 1. Attempt to bind a [ServerSocket] — catches most listeners.
+     * 2. Attempt a TCP connect to `localhost:port` with a short timeout —
+     *    catches services that may be listening but where bind might succeed
+     *    due to socket reuse options.
+     *
+     * @return `true` if the port appears to be free on this machine.
+     */
     private fun isPortAvailable(port: Int): Boolean {
-        return try {
+        // Strategy 1: Try to bind a server socket
+        val bindable = try {
             ServerSocket(port).use { true }
         } catch (_: Exception) {
             false
         }
+
+        if (!bindable) return false
+
+        // Strategy 2: Try to connect to localhost:port with a very short timeout.
+        // If the connection succeeds, something is already listening.
+        val connectable = try {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress("localhost", port), 100)
+                true  // Something answered — port is in use
+            }
+        } catch (_: Exception) {
+            false // Nothing answered — port is likely free
+        }
+
+        return !connectable
     }
 }

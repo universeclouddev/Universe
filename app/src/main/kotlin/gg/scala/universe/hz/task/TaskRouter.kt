@@ -83,7 +83,7 @@ class TaskRouter @Inject constructor(
                 command = configuration.command,
                 ramMB = configuration.ramMB,
                 cpu = configuration.cpu,
-                templateConfig = configuration.templateInstallationConfig,
+                configuration = configuration,
                 environmentVariables = envVars
             )
         } catch (e: Exception) {
@@ -112,6 +112,10 @@ class TaskRouter @Inject constructor(
             return
         }
 
+        // Resolve the actual host address (runtime may override, e.g. K8s pod IP)
+        val resolvedHostAddress = runtimeProvider.getHostAddress(task.instanceId)
+            .ifBlank { configuration.hostAddress }
+
         // Update instance info in Hazelcast
         val existing = clusterStateService.getInstance(task.instanceId)
         if (existing != null) {
@@ -120,6 +124,7 @@ class TaskRouter @Inject constructor(
                     state = InstanceState.ONLINE,
                     allocatedPort = allocatedPort,
                     processPid = processHandle.pid(),
+                    hostAddress = resolvedHostAddress,
                     runtime = configuration.runtime
                 )
             )
@@ -130,11 +135,14 @@ class TaskRouter @Inject constructor(
         clusterStateService.addNodeResources(nodeId, configuration.ramMB, configuration.cpu)
 
         // Write state file for recovery after node restart
-        writeStateFile(workingDir, existing?.copy(runtime = configuration.runtime) ?: InstanceInfo(
+        writeStateFile(workingDir, existing?.copy(
+            hostAddress = resolvedHostAddress,
+            runtime = configuration.runtime
+        ) ?: InstanceInfo(
             id = task.instanceId,
             configurationName = configuration.name,
             wrapperNodeId = nodeId,
-            hostAddress = configuration.hostAddress,
+            hostAddress = resolvedHostAddress,
             allocatedPort = allocatedPort,
             state = InstanceState.ONLINE,
             lastHeartbeat = System.currentTimeMillis(),
