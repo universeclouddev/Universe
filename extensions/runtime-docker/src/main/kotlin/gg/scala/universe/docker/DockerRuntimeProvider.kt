@@ -41,7 +41,7 @@ class DockerRuntimeProvider(
         command: String,
         ramMB: Int,
         cpu: Int,
-        templateConfig: gg.scala.universe.schema.TemplateInstallationConfig?,
+        configuration: gg.scala.universe.schema.Configuration,
         environmentVariables: Map<String, String>?
     ): ProcessHandle {
         val containerName = "universe-$instanceId"
@@ -183,6 +183,12 @@ class DockerRuntimeProvider(
         } catch (e: Exception) {
             log("Failed to stop Docker container for instance $instanceId: ${e.message}", LogLevel.ERROR)
         }
+    }
+
+    override fun getHostAddress(instanceId: String): String {
+        // Docker containers on the same network can reach each other by container name.
+        // External access requires explicit port mapping. Return empty to use configured hostAddress.
+        return ""
     }
 
     override fun executeCommand(instanceId: String, command: String) {
