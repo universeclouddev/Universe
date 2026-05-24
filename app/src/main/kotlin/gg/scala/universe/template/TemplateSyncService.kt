@@ -218,12 +218,13 @@ class TemplateSyncService @Inject constructor(
      * Guards against zip-slip path traversal attacks.
      */
     fun unzipDirectory(zipBytes: ByteArray, target: Path) {
+        val safeTarget = target.normalize().toAbsolutePath()
         ByteArrayInputStream(zipBytes).use { bais ->
             ZipInputStream(bais).use { zis ->
                 var entry = zis.nextEntry
                 while (entry != null) {
-                    val entryPath = target.resolve(entry.name).normalize()
-                    if (!entryPath.startsWith(target)) {
+                    val entryPath = safeTarget.resolve(entry.name).normalize()
+                    if (!entryPath.startsWith(safeTarget)) {
                         log(
                             "Skipping zip entry with path traversal: ${entry.name}",
                             LogLevel.WARNING
