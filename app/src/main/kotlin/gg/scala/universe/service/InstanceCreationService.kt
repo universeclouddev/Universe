@@ -71,9 +71,17 @@ class InstanceCreationService @Inject constructor(
      * Returns null if no node has enough resources.
      */
     fun findBestNode(configuration: Configuration): Member? {
+        val allowedNodes = configuration.nodes
+
         val candidates = hazelcastInstance.cluster.members.filter { member ->
-            val nodeId = member.uuid.toString()
-            val resources = clusterStateService.getNodeResources(nodeId)
+            val nodeId = member.getAttribute("nodeId") ?: return@filter false
+
+            // Only consider nodes explicitly listed in the configuration
+            if (nodeId !in allowedNodes) {
+                return@filter false
+            }
+
+            val resources = clusterStateService.getNodeResources(member.uuid.toString())
             val maxRam = member.getAttribute("maxRamMB")?.toIntOrNull() ?: Int.MAX_VALUE
             val maxCpu = member.getAttribute("maxCpu")?.toIntOrNull() ?: Int.MAX_VALUE
 
@@ -87,8 +95,7 @@ class InstanceCreationService @Inject constructor(
 
         // Pick the node with the most available RAM
         return candidates.maxByOrNull { member ->
-            val nodeId = member.uuid.toString()
-            val resources = clusterStateService.getNodeResources(nodeId)
+            val resources = clusterStateService.getNodeResources(member.uuid.toString())
             val maxRam = member.getAttribute("maxRamMB")?.toIntOrNull() ?: Int.MAX_VALUE
             maxRam - resources.usedRamMB
         }
