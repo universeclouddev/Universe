@@ -76,23 +76,36 @@ class TemplateManager @Inject constructor(
 
         sorted.forEach { template ->
             if (template.storage != "local") {
+                // Non-local templates are extracted directly into the running folder
+                // to avoid polluting ./templates/ and to allow local+remote templates
+                // with the same group/name to coexist.
                 val provider = storageRegistry.get(template.storage)
                 if (provider != null) {
-                    provider.downloadTemplate(template.group, template.name)
+                    val success = provider.extractTemplate(
+                        template.group,
+                        template.name,
+                        targetDir,
+                        config.onTemplatePasteOverridePresentFiles
+                    )
+                    if (success) {
+                        log("Extracted template '${template.name}' from group '${template.group}' (storage=${template.storage})")
+                    } else {
+                        log("Failed to extract template ${template.group}/${template.name} from storage '${template.storage}'", LogLevel.WARNING)
+                    }
                 } else {
                     log("No storage provider found for '${template.storage}', skipping template ${template.group}/${template.name}", LogLevel.WARNING)
+                }
+            } else {
+                // Local templates are copied from ./templates/<group>/<name>/
+                val sourceDir = templatesDir.resolve(template.group).resolve(template.name)
+                if (!sourceDir.exists() || !sourceDir.isDirectory()) {
+                    log("Template directory not found: $sourceDir", LogLevel.WARNING)
                     return@forEach
                 }
-            }
 
-            val sourceDir = templatesDir.resolve(template.group).resolve(template.name)
-            if (!sourceDir.exists() || !sourceDir.isDirectory()) {
-                log("Template directory not found: $sourceDir", LogLevel.WARNING)
-                return@forEach
+                copyDirectory(sourceDir, targetDir, config.onTemplatePasteOverridePresentFiles)
+                log("Pasted template '${template.name}' from group '${template.group}'")
             }
-
-            copyDirectory(sourceDir, targetDir, config.onTemplatePasteOverridePresentFiles)
-            log("Pasted template '${template.name}' from group '${template.group}'")
         }
 
         // Apply variable replacement

@@ -110,6 +110,36 @@ class S3TemplateStorage @Inject constructor() : TemplateStorageProvider {
     }
 
     /**
+     * Downloads `templates/<group>/<name>.zip` from S3 and extracts it
+     * directly into [targetDir], bypassing the local `./templates/` directory.
+     *
+     * This allows S3 templates to coexist with local templates of the same
+     * group/name without file contamination.
+     */
+    override fun extractTemplate(group: String, name: String, targetDir: Path, overwrite: Boolean): Boolean {
+        val key = "${config.prefix}${group}/${name}.zip"
+
+        return try {
+            log("Extracting template $group/$name from S3 directly to $targetDir (key=$key)")
+
+            val responseBytes = client.getObjectAsBytes(
+                GetObjectRequest.builder()
+                    .bucket(config.bucket)
+                    .key(key)
+                    .build()
+            )
+
+            unzipToTarget(responseBytes.asByteArray(), targetDir, overwrite)
+
+            log("Extracted template $group/$name from S3 to $targetDir", LogLevel.SUCCESS)
+            true
+        } catch (e: Exception) {
+            log("Failed to extract template $group/$name from S3: ${e.message}", LogLevel.ERROR)
+            false
+        }
+    }
+
+    /**
      * Lists templates in the given group by scanning the S3 prefix.
      *
      * @param group The template group name.
@@ -214,6 +244,40 @@ class S3TemplateStorage @Inject constructor() : TemplateStorageProvider {
                     } else {
                         Files.createDirectories(entryPath.parent)
                         Files.copy(zis, entryPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                    }
+                    zis.closeEntry()
+                    entry = zis.nextEntry
+                }
+            }
+        }
+    }
+
+    /**
+     * Extracts [zipBytes] into [targetDir], respecting the [overwrite] flag.
+     * If [overwrite] is false and a file already exists, it is skipped.
+     * Guards against zip-slip path traversal attacks.
+     */
+    private fun unzipToTarget(zipBytes: ByteArray, targetDir: Path, overwrite: Boolean) {
+        ByteArrayInputStream(zipBytes).use { bais ->
+            ZipInputStream(bais).use { zis ->
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    val entryPath = targetDir.resolve(entry.name).normalize()
+                    if (!entryPath.startsWith(targetDir)) {
+                        log("Skipping zip entry with path traversal: ${entry.name}", LogLevel.WARNING)
+                        entry = zis.nextEntry
+                        continue
+                    }
+
+                    if (entry.isDirectory) {
+                        if (!entryPath.exists()) {
+                            Files.createDirectories(entryPath)
+                        }
+                    } else {
+                        if (overwrite || !entryPath.exists()) {
+                            Files.createDirectories(entryPath.parent)
+                            Files.copy(zis, entryPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                        }
                     }
                     zis.closeEntry()
                     entry = zis.nextEntry
