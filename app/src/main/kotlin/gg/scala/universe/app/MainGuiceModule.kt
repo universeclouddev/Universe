@@ -23,8 +23,10 @@ import gg.scala.universe.metrics.MetricsRegistryImpl
 import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.runtime.RuntimeRegistryImpl
 import gg.scala.universe.template.DefaultTemplateVariableProvider
+import gg.scala.universe.template.TemplateResolver
 import gg.scala.universe.template.TemplateStorageRegistry
 import gg.scala.universe.template.TemplateStorageRegistryImpl
+import gg.scala.universe.template.TemplateSyncService
 import gg.scala.universe.template.TemplateVariableRegistry
 import gg.scala.universe.template.TemplateVariableRegistryImpl
 import org.incendo.cloud.CommandManager
@@ -42,6 +44,7 @@ class MainGuiceModule : AbstractModule() {
         bind(DatabaseRegistry::class.java).to(DatabaseRegistryImpl::class.java).asEagerSingleton()
         bind(MetricsRegistry::class.java).to(MetricsRegistryImpl::class.java).asEagerSingleton()
         bind(ClusterDataProvider::class.java).to(ClusterDataProviderImpl::class.java).asEagerSingleton()
+        bind(TemplateResolver::class.java).to(TemplateSyncService::class.java).asEagerSingleton()
         bind(ExecutorService::class.java).toInstance(Executors.newFixedThreadPool(4))
     }
 
