@@ -22,4 +22,18 @@ data class UniverseMainConfiguration(
     /** Auto-update sources for configurations and templates. */
     val updateSources: List<UpdateSource> = emptyList(),
     val nodeSpecificVariables: Map<String, String> = mutableMapOf("region" to "us-east-1"),
+
+    /**
+     * The address Hazelcast binds its server socket to.
+     * Use `"0.0.0.0"` in Docker to accept connections on all interfaces.
+     * Defaults to [address] for backward compatibility.
+     */
+    val bindAddress: String = address,
+
+    /**
+     * The address advertised to other Hazelcast cluster members.
+     * Use your Tailscale IP here when running behind Docker NAT.
+     * Defaults to [address] for backward compatibility.
+     */
+    val publicAddress: String = address,
 )

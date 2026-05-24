@@ -30,11 +30,27 @@ class HazelcastService {
         hzConfig.setProperty("hazelcast.shutdownhook.enabled", "false")
 
         // Network
-        val pubAddress = "${configuration.address}:${configuration.port}"
         val network = hzConfig.networkConfig
         network.port = configuration.port
         network.isPortAutoIncrement = false // do not auto increment - we want to fail if the port is already in use (indicates a config issue)
+
+        // publicAddress is what other cluster members use to reach this node.
+        // In Docker + Tailscale setups, set this to the Tailscale IP so nodes
+        // can find each other over the mesh network.
+        val pubAddress = "${configuration.publicAddress}:${configuration.port}"
         network.publicAddress = pubAddress
+
+        // bindAddress controls which local interface Hazelcast binds to.
+        // "0.0.0.0" means all interfaces (required in Docker so port forwarding works).
+        // Any other value restricts binding to that specific interface.
+        if (configuration.bindAddress == "0.0.0.0") {
+            network.interfaces.isEnabled = false
+            log("Hazelcast binding to all interfaces (0.0.0.0), advertising $pubAddress")
+        } else {
+            network.interfaces.isEnabled = true
+            network.interfaces.addInterface(configuration.bindAddress)
+            log("Hazelcast binding to ${configuration.bindAddress}, advertising $pubAddress")
+        }
 
         // Discovery
         val join = network.join
@@ -45,7 +61,7 @@ class HazelcastService {
         tcpIpConfig.isEnabled = true
 
         if (configuration.isMasterNode) {
-            tcpIpConfig.addMember("127.0.0.1")
+            tcpIpConfig.addMember(configuration.publicAddress)
 
             log("Starting Universe in MASTER mode on port ${network.port}")
         } else {
