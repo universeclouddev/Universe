@@ -10,6 +10,7 @@ import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.schema.InstanceInfo
 import gg.scala.universe.task.DeployInstanceTask
 import gg.scala.universe.task.ExecuteCommandTask
+import gg.scala.universe.task.ShutdownNodeTask
 import gg.scala.universe.task.StopInstanceTask
 import gg.scala.universe.util.json.Serializers
 
@@ -42,6 +43,12 @@ class TaskDispatcher @Inject constructor(
             instanceId = instanceId,
             command = command
         )
+        submit(task, targetMember)
+    }
+
+    fun dispatchShutdown(targetMember: Member) {
+        log("Dispatching shutdown task to node ${targetMember.nodeName()}")
+        val task = ShutdownNodeTask()
         submit(task, targetMember)
     }
 

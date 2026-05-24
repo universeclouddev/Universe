@@ -2,6 +2,7 @@ package gg.scala.universe.hz.task
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
+import com.hazelcast.core.HazelcastInstance
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
@@ -11,6 +12,7 @@ import gg.scala.universe.schema.InstanceInfo
 import gg.scala.universe.schema.InstanceState
 import gg.scala.universe.task.DeployInstanceTask
 import gg.scala.universe.task.ExecuteCommandTask
+import gg.scala.universe.task.ShutdownNodeTask
 import gg.scala.universe.task.StopInstanceTask
 import gg.scala.universe.task.UniverseTask
 import gg.scala.universe.template.TemplateManager
@@ -27,13 +29,15 @@ class TaskRouter @Inject constructor(
     private val clusterStateService: ClusterStateService,
     private val portAllocator: PortAllocator,
     private val templateManager: TemplateManager,
-    private val variableRegistry: TemplateVariableRegistry
+    private val variableRegistry: TemplateVariableRegistry,
+    private val hazelcastInstance: HazelcastInstance
 ) {
     fun route(task: UniverseTask) {
         when (task) {
             is DeployInstanceTask -> handleDeploy(task)
             is StopInstanceTask -> handleStop(task)
             is ExecuteCommandTask -> handleExecute(task)
+            is ShutdownNodeTask -> handleShutdown(task)
         }
     }
 
@@ -42,6 +46,7 @@ class TaskRouter @Inject constructor(
 
         val configuration = clusterStateService.getConfiguration(task.configurationName)
             ?: return log("Configuration ${task.configurationName} not found for instance ${task.instanceId}", LogLevel.ERROR)
+
 
         val runtimeProvider = runtimeRegistry.get(configuration.runtime)
             ?: return log("Runtime '${configuration.runtime}' not registered for instance ${task.instanceId}", LogLevel.ERROR)
@@ -222,6 +227,34 @@ class TaskRouter @Inject constructor(
             ?: return log("No runtime provider available to execute command on instance ${task.instanceId}", LogLevel.ERROR)
 
         runtimeProvider.executeCommand(task.instanceId, task.command)
+    }
+
+    private fun handleShutdown(task: ShutdownNodeTask) {
+        log("Routing shutdown task — stopping all local instances and exiting")
+
+        // Stop all instances assigned to this node
+        val localInstances = clusterStateService.getAllInstances()
+            .filter { it.wrapperNodeId == hazelcastInstance.cluster.localMember.uuid.toString() }
+            .filter { it.state == InstanceState.ONLINE || it.state == InstanceState.CREATING }
+
+        localInstances.forEach { instance ->
+            try {
+                val runtimeProvider = runtimeRegistry.get(instance.runtime)
+                    ?: runtimeRegistry.getAll().values.firstOrNull()
+                runtimeProvider?.stop(instance.id)
+                portAllocator.release(instance.allocatedPort)
+                clusterStateService.updateInstanceState(instance.id, InstanceState.STOPPED)
+                log("Stopped instance ${instance.id} during shutdown")
+            } catch (e: Exception) {
+                log("Failed to stop instance ${instance.id} during shutdown: ${e.message}", LogLevel.WARNING)
+            }
+        }
+
+        // Give Hazelcast a moment to propagate state changes
+        Thread.sleep(500)
+
+        log("Node shutdown complete, exiting JVM")
+        Runtime.getRuntime().exit(0)
     }
 
     private fun writeStateFile(workingDir: Path, instance: InstanceInfo) {

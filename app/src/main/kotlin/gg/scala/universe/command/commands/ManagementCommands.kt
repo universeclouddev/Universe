@@ -78,6 +78,20 @@ class ManagementCommands @Inject constructor(
         }
     }
 
+    @Command("cluster shutdown")
+    fun clusterShutdown(source: CommandSource) {
+        val members = hazelcastInstance.cluster.members
+        source.sendMessage("Shutting down ${members.size} cluster node(s)...")
+
+        members.forEach { member ->
+            val nodeId = member.getAttribute("nodeId") ?: member.uuid.toString()
+            source.sendMessage("  → Sending shutdown to $nodeId")
+            taskDispatcher.dispatchShutdown(member)
+        }
+
+        source.sendMessage("Shutdown dispatched to all nodes.")
+    }
+
     @Command("node info")
     fun nodeInfo(source: CommandSource) {
         val localMember = hazelcastInstance.cluster.localMember
@@ -487,6 +501,7 @@ class ManagementCommands @Inject constructor(
         source.sendMessage("Cluster:")
         source.sendMessage("  cluster status          - Show cluster status")
         source.sendMessage("  cluster nodes           - List cluster nodes")
+        source.sendMessage("  cluster shutdown        - Shutdown all cluster nodes")
         source.sendMessage("")
         source.sendMessage("Node:")
         source.sendMessage("  node info               - Show local node resources")
