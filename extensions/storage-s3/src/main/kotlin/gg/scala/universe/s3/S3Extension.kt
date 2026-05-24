@@ -1,6 +1,7 @@
 package gg.scala.universe.s3
 
 import com.google.inject.Inject
+import gg.scala.universe.command.CommandProvider
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.extension.Extension
@@ -10,7 +11,7 @@ import gg.scala.universe.template.TemplateStorageRegistry
  * Extension bootstrap for the S3 template storage backend.
  *
  * Registers [S3TemplateStorage] with the [TemplateStorageRegistry]
- * on load and unregisters it on unload.
+ * and [S3Commands] with the [CommandProvider] on load.
  */
 class S3Extension : Extension {
 
@@ -21,14 +22,19 @@ class S3Extension : Extension {
     private lateinit var templateStorageRegistry: TemplateStorageRegistry
 
     @Inject
+    private lateinit var commandProvider: CommandProvider
+
+    @Inject
     private lateinit var s3TemplateStorage: S3TemplateStorage
 
     override fun onLoad() {
         templateStorageRegistry.register(s3TemplateStorage)
+        commandProvider.register(S3Commands::class.java)
         log("S3 template storage extension loaded (bucket=${s3TemplateStorage.bucket})", LogLevel.SUCCESS)
     }
 
     override fun onUnload() {
+        commandProvider.unregister("s3")
         templateStorageRegistry.unregister(s3TemplateStorage.storageKey)
         s3TemplateStorage.close()
         log("S3 template storage extension unloaded")
