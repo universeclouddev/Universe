@@ -114,7 +114,7 @@ class AutoUpdaterService @Inject constructor(
         }
 
         // 2. Try common suffixes
-        val suffixes = listOf(".sha256", ".sha1", ".md5")
+        val suffixes = listOf(".sha512", ".sha256", ".sha1", ".md5")
         for (suffix in suffixes) {
             val hash = fetchText(source.url + suffix)?.trim()
             if (!hash.isNullOrBlank()) return hash
