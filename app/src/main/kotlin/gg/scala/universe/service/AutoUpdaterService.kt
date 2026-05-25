@@ -6,6 +6,7 @@ import gg.scala.universe.config.UpdateSource
 import gg.scala.universe.config.UniverseMainConfiguration
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
+import gg.scala.universe.template.TemplateStorageRegistry
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -26,7 +27,8 @@ import java.util.concurrent.TimeUnit
  */
 @Singleton
 class AutoUpdaterService @Inject constructor(
-    private val configuration: UniverseMainConfiguration
+    private val configuration: UniverseMainConfiguration,
+    private val storageRegistry: TemplateStorageRegistry
 ) {
     private val client = HttpClient.newBuilder()
         .connectTimeout(java.time.Duration.ofSeconds(10))
@@ -192,6 +194,49 @@ class AutoUpdaterService @Inject constructor(
 
         localHashes[source.targetPath] = sha256(content)
         log("AutoUpdater: Downloaded ${source.url} → ${source.targetPath} (${content.size} bytes)", LogLevel.SUCCESS)
+
+        // Sync to remote storage if configured
+        syncToStorage(source)
+    }
+
+    /**
+     * If [UpdateSource.syncToStorage] is set and the target path is under
+     * `./templates/<group>/<name>/`, zips the template and uploads it to the
+     * configured storage provider (e.g. S3).
+     */
+    private fun syncToStorage(source: UpdateSource) {
+        val providerKey = source.syncToStorage ?: return
+        val targetPath = source.targetPath
+
+        // Only sync template directories
+        if (!targetPath.startsWith("./templates/") && !targetPath.startsWith("templates/")) {
+            log("AutoUpdater: syncToStorage skipped — target is not under ./templates/", LogLevel.DEBUG)
+            return
+        }
+
+        val normalized = targetPath.removePrefix("./").removePrefix("templates/")
+        val parts = normalized.split("/")
+        if (parts.size < 2) {
+            log("AutoUpdater: syncToStorage skipped — cannot parse group/name from $targetPath", LogLevel.WARNING)
+            return
+        }
+
+        val group = parts[0]
+        val name = parts[1]
+
+        val provider = storageRegistry.get(providerKey)
+        if (provider == null) {
+            log("AutoUpdater: syncToStorage skipped — no provider registered for '$providerKey'", LogLevel.WARNING)
+            return
+        }
+
+        log("AutoUpdater: Syncing template $group/$name to storage '$providerKey'...")
+        val success = provider.uploadTemplate(group, name)
+        if (success) {
+            log("AutoUpdater: Synced template $group/$name to '$providerKey'", LogLevel.SUCCESS)
+        } else {
+            log("AutoUpdater: Failed to sync template $group/$name to '$providerKey'", LogLevel.WARNING)
+        }
     }
 
     private fun sha256(bytes: ByteArray): String {
