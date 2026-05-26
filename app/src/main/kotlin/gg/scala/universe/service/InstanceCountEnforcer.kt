@@ -9,6 +9,7 @@ import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.schema.InstanceState
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.math.min
 
 /**
  * Automatically enforces [Configuration.minimumServiceCount] by spawning
@@ -64,7 +65,6 @@ class InstanceCountEnforcer @Inject constructor(
             val allInstances = clusterStateService.getAllInstances()
 
             for (config in configs) {
-                if (config.static) continue
                 if (config.minimumServiceCount <= 0) continue
 
                 val activeCount = allInstances.count {
@@ -72,7 +72,7 @@ class InstanceCountEnforcer @Inject constructor(
                     (it.state == InstanceState.ONLINE || it.state == InstanceState.CREATING)
                 }
 
-                val deficit = config.minimumServiceCount - activeCount
+                val deficit = if (config.static) min(config.minimumServiceCount - activeCount, 1) else config.minimumServiceCount - activeCount
                 if (deficit <= 0) continue
 
                 log(
