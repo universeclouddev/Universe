@@ -117,9 +117,17 @@ class TaskRouter @Inject constructor(
             return
         }
 
-        // Resolve the actual host address (runtime may override, e.g. K8s pod IP)
+        // Resolve the actual host address (runtime may override, e.g. K8s pod IP).
+        // Also apply template variable replacement to configuration.hostAddress so
+        // placeholders like %TAILSCALE_IP% are resolved for screen/tmux runtimes.
         val resolvedHostAddress = runtimeProvider.getHostAddress(task.instanceId)
-            .ifBlank { configuration.hostAddress }
+            .ifBlank {
+                var addr = configuration.hostAddress
+                variables.forEach { (placeholder, replacement) ->
+                    addr = addr.replace(placeholder, replacement)
+                }
+                addr
+            }
 
         // Update instance info in Hazelcast
         val existing = clusterStateService.getInstance(task.instanceId)

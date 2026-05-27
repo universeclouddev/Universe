@@ -63,6 +63,14 @@ class UniverseApplication {
         runtimeRegistry.register("process", ProcessRuntimeProvider())
         log("Registered built-in runtime providers (tmux, screen, process)")
 
+        // Load extensions BEFORE starting services that process Hazelcast tasks.
+        // This prevents "Runtime 'kube' not registered" errors when deploy
+        // tasks arrive from the master immediately after joining.
+        extensionService = ExtensionService()
+        injector.injectMembers(extensionService)
+        extensionService.installExtensions()
+        extensionService.loadExtensions()
+
         // Start health monitor on every node (wrappers run instances too)
         val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
         healthMonitor.start()
@@ -79,11 +87,6 @@ class UniverseApplication {
             log("Registered MembershipListener for instance resilience")
             ConfigurationLoader.load(clusterStateService)
         }
-
-        extensionService = ExtensionService()
-        injector.injectMembers(extensionService)
-        extensionService.installExtensions()
-        extensionService.loadExtensions()
 
         // Recover instances that were running before restart
         val recoveryService = injector.getInstance(InstanceRecoveryService::class.java)
