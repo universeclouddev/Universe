@@ -25,7 +25,8 @@ class ScreenRuntimeProvider : RuntimeProvider {
         ramMB: Int,
         cpu: Int,
         configuration: gg.scala.universe.schema.Configuration,
-        environmentVariables: Map<String, String>?
+        environmentVariables: Map<String, String>?,
+        additionalPorts: List<gg.scala.universe.schema.AdditionalPort>
     ): ProcessHandle {
         val sessionName = sessionName(instanceId)
 

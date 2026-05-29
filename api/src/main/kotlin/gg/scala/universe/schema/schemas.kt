@@ -2,6 +2,12 @@ package gg.scala.universe.schema
 
 data class PortRange(val min: Int, val max: Int)
 
+data class AdditionalPort(
+    val port: Int,
+    val protocol: String = "TCP",
+    val name: String = ""
+)
+
 enum class InstanceState {
     CREATING,
     ONLINE,
@@ -47,6 +53,7 @@ data class Configuration(
     val templateInstallationConfig: TemplateInstallationConfig = TemplateInstallationConfig(),
     val fileModifications: List<String> = emptyList(),
     val properties: Map<String, String> = emptyMap(),
+    val additionalPorts: List<AdditionalPort> = emptyList(),
 )
 
 data class NodeResources(

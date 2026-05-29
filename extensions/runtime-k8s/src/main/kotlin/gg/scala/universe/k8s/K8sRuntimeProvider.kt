@@ -69,7 +69,8 @@ class K8sRuntimeProvider(
         ramMB: Int,
         cpu: Int,
         configuration: gg.scala.universe.schema.Configuration,
-        environmentVariables: Map<String, String>?
+        environmentVariables: Map<String, String>?,
+        additionalPorts: List<gg.scala.universe.schema.AdditionalPort>
     ): ProcessHandle {
         val k8s = requireClient()
         val podName = "universe-$instanceId"
@@ -98,6 +99,18 @@ class K8sRuntimeProvider(
                 .withHostPort(port)
                 .withProtocol("TCP")
             .endPort()
+
+        // Add additional ports from the instance configuration (e.g. voice chat, metrics)
+        additionalPorts.forEach { ap ->
+            val proto = if (ap.protocol.equals("udp", ignoreCase = true)) "UDP" else "TCP"
+            containerBuilder.addNewPort()
+                .withContainerPort(ap.port)
+                .withHostPort(ap.port)
+                .withProtocol(proto)
+                .withName(ap.name.ifBlank { "port-${ap.port}" })
+                .endPort()
+            log("K8s pod '$podName' additional port: ${ap.port}/$proto${if (ap.name.isNotBlank()) " (${ap.name})" else ""}")
+        }
 
         // Working directory volume: hostPath for local, emptyDir for cloud
         val workVolumeName = "universe-workdir-$instanceId"

@@ -23,6 +23,8 @@ interface RuntimeProvider {
      *        fileModifications, properties, template configs, etc.
      * @param environmentVariables Optional environment variables to set for the process.
      *        Values may contain template placeholders that have already been replaced.
+     * @param additionalPorts Extra ports to expose/forward alongside the main allocated port.
+     *        Used by Docker and K8s runtimes for multi-port applications (e.g. voice chat, metrics).
      * @return A [ProcessHandle] representing the started process.
      */
     fun start(
@@ -33,7 +35,8 @@ interface RuntimeProvider {
         ramMB: Int,
         cpu: Int,
         configuration: Configuration,
-        environmentVariables: Map<String, String>? = null
+        environmentVariables: Map<String, String>? = null,
+        additionalPorts: List<gg.scala.universe.schema.AdditionalPort> = emptyList()
     ): ProcessHandle
 
     /**

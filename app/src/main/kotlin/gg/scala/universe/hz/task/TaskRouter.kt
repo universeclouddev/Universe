@@ -89,7 +89,8 @@ class TaskRouter @Inject constructor(
                 ramMB = configuration.ramMB,
                 cpu = configuration.cpu,
                 configuration = configuration,
-                environmentVariables = envVars
+                environmentVariables = envVars,
+                additionalPorts = configuration.additionalPorts
             )
         } catch (e: Exception) {
             val cause = e.cause ?: e

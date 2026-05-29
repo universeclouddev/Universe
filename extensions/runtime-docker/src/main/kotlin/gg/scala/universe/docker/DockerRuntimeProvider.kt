@@ -42,7 +42,8 @@ class DockerRuntimeProvider(
         ramMB: Int,
         cpu: Int,
         configuration: gg.scala.universe.schema.Configuration,
-        environmentVariables: Map<String, String>?
+        environmentVariables: Map<String, String>?,
+        additionalPorts: List<gg.scala.universe.schema.AdditionalPort>
     ): ProcessHandle {
         val containerName = "universe-$instanceId"
 
@@ -73,6 +74,18 @@ class DockerRuntimeProvider(
             }
             exposedPorts.add(exposed)
             portBindings.bind(exposed, Ports.Binding.empty())
+        }
+
+        // Add additional ports from the instance configuration (e.g. voice chat, metrics)
+        additionalPorts.forEach { ap ->
+            val exposed = if (ap.protocol.equals("udp", ignoreCase = true)) {
+                ExposedPort.udp(ap.port)
+            } else {
+                ExposedPort.tcp(ap.port)
+            }
+            exposedPorts.add(exposed)
+            portBindings.bind(exposed, Ports.Binding.bindPort(ap.port))
+            log("Docker container '$containerName' additional port: ${ap.port}/${ap.protocol}${if (ap.name.isNotBlank()) " (${ap.name})" else ""}")
         }
 
         // Build volume binds
