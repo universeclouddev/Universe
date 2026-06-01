@@ -81,12 +81,21 @@ class CommandBootstrap @Inject constructor(
                 setVariable(LineReader.COMPLETION_STYLE_LIST_BACKGROUND, "bg:default")
             }
 
-        // Redirect stdout/stderr through JLine so async logs print above the prompt
+        // Redirect stdout/stderr through JLine so async logs print above the prompt.
+        // In Docker, skip this to avoid TTY deadlock: async logs from Hazelcast/Ktor
+        // threads calling printAbove() can stall on the terminal lock when the Docker
+        // TTY proxy slows down, freezing the console thread forever.
+        val inDocker = isRunningInDocker()
+        if (inDocker) {
+            log("Running in Docker — skipping JLine stdout capture to avoid TTY deadlock", LogLevel.DEBUG)
+        }
         originalOut = System.out
         originalErr = System.err
-        val jlineOut = createJLinePrintStream(lineReader!!)
-        System.setOut(jlineOut)
-        System.setErr(jlineOut)
+        if (!inDocker) {
+            val jlineOut = createJLinePrintStream(lineReader!!)
+            System.setOut(jlineOut)
+            System.setErr(jlineOut)
+        }
 
         consoleThread = Thread({
             try {
@@ -157,6 +166,19 @@ class CommandBootstrap @Inject constructor(
     }
 
     /**
+     * Detects whether the process is running inside a Docker container.
+     * Checks for the presence of `/.dockerenv` or `docker` in `/proc/self/cgroup`.
+     */
+    private fun isRunningInDocker(): Boolean {
+        return try {
+            java.io.File("/.dockerenv").exists() ||
+                java.io.File("/proc/self/cgroup").readText().contains("docker")
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
      * Creates a PrintStream that delegates to JLine's printAbove().
      * This ensures async log output appears above the prompt.
      *
@@ -176,7 +198,7 @@ class CommandBootstrap @Inject constructor(
                             reader.printAbove(line)
                         } catch (_: IllegalStateException) {
                             // Terminal closed — write to original stdout as fallback
-                            kotlin.io.println(line)
+                            originalOut?.println(line) ?: kotlin.io.println(line)
                         }
                     }
                     buffer.reset()
