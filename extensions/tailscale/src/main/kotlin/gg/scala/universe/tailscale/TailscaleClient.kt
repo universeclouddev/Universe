@@ -37,11 +37,15 @@ class TailscaleClient(private val config: TailscaleConfig) {
 
     private fun fetchStatus(): TailscaleStatus? {
         return try {
-            val args = mutableListOf(config.binaryPath, "status", "--json")
+            // --socket is a global flag on the tailscale command, not a subcommand flag.
+            // It must appear BEFORE the subcommand (e.g. tailscale --socket ... status --json).
+            val args = mutableListOf(config.binaryPath)
             if (!config.socketPath.isNullOrBlank()) {
                 args.add("--socket")
                 args.add(config.socketPath)
             }
+            args.add("status")
+            args.add("--json")
             val process = ProcessBuilder(args)
                 .redirectErrorStream(true)
                 .start()
