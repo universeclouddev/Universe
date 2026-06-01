@@ -67,7 +67,6 @@ class HazelcastService {
         } else {
             val masterAddress = "${configuration.masterAddress}:${configuration.masterPort}"
             tcpIpConfig.addMember(masterAddress)
-            hzConfig.isLiteMember = true
 
             log("Starting Universe in WRAPPER mode, connecting to Master at $masterAddress")
         }
