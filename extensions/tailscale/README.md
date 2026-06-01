@@ -59,7 +59,8 @@ Create `./extensions/tailscale/config.json`:
 {
   "binaryPath": "tailscale",
   "timeoutMs": 5000,
-  "warnIfUnavailable": true
+  "warnIfUnavailable": true,
+  "socketPath": "/var/run/tailscale/tailscaled.sock"
 }
 ```
 
@@ -68,6 +69,7 @@ Create `./extensions/tailscale/config.json`:
 | `binaryPath` | `"tailscale"` | Path to the `tailscale` binary. Change if it's not in `PATH`. |
 | `timeoutMs` | `5000` | Max wait time for `tailscale status --json` to respond. |
 | `warnIfUnavailable` | `true` | Log a warning on startup if Tailscale is not running. |
+| `socketPath` | `null` | Path to the `tailscaled` daemon socket. Required in Docker when the socket is mounted at a non-standard location. Common values: `/var/run/tailscale/tailscaled.sock`, `/run/tailscale/tailscaled.sock`. |
 
 ## Using the Variables
 

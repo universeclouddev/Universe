@@ -37,7 +37,12 @@ class TailscaleClient(private val config: TailscaleConfig) {
 
     private fun fetchStatus(): TailscaleStatus? {
         return try {
-            val process = ProcessBuilder(config.binaryPath, "status", "--json")
+            val args = mutableListOf(config.binaryPath, "status", "--json")
+            if (!config.socketPath.isNullOrBlank()) {
+                args.add("--socket")
+                args.add(config.socketPath)
+            }
+            val process = ProcessBuilder(args)
                 .redirectErrorStream(true)
                 .start()
 

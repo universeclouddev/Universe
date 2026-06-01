@@ -18,5 +18,17 @@ data class TailscaleConfig(
     /**
      * When true, the extension logs a warning on startup if Tailscale is not available.
      */
-    val warnIfUnavailable: Boolean = true
+    val warnIfUnavailable: Boolean = true,
+
+    /**
+     * Path to the `tailscaled` daemon socket.
+     * If set, the `tailscale` CLI is invoked with `--socket <path>` so it can
+     * connect to the daemon inside a Docker container or non-standard location.
+     * Defaults to `null` (let tailscale auto-detect).
+     *
+     * Common values:
+     * - `/var/run/tailscale/tailscaled.sock` (most Linux distros)
+     * - `/run/tailscale/tailscaled.sock` (some distros, e.g. Arch)
+     */
+    val socketPath: String? = null
 )
