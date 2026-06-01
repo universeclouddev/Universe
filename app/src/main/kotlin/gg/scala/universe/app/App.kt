@@ -45,6 +45,9 @@ class UniverseApplication {
     val extensionService: ExtensionService
     var commandBootstrap: CommandBootstrap
 
+    @Volatile
+    private var isShuttingDown = false
+
     init {
         instance = this
         mainConfiguration = ConfigLoader.load()
@@ -95,46 +98,14 @@ class UniverseApplication {
         commandBootstrap = injector.getInstance(CommandBootstrap::class.java)
         commandBootstrap.start()
 
+        // Register explicit signal handlers so Docker SIGTERM (and Ctrl+C)
+        // triggers the same graceful shutdown as the CLI `stop` command.
+        registerSignalHandlers()
+
+        // Keep the shutdown hook as a fallback in case exit() is called
+        // from a path that bypasses the signal handlers.
         Runtime.getRuntime().addShutdownHook(Thread({
-            try {
-                // Stop the console first so JLine terminal is closed cleanly
-                // and stdout/stderr are restored to their originals.
-                commandBootstrap.stop()
-
-                // Use println directly to bypass JLine entirely during shutdown
-                println("  ${Ansi.BLUE}→${Ansi.RESET} Shutting down Universe...")
-
-                // Stop background services first so they don't race with Hazelcast
-                println("  ${Ansi.BLUE}→${Ansi.RESET} Stopping background services...")
-                val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
-                healthMonitor.stop()
-                val autoUpdater = injector.getInstance(AutoUpdaterService::class.java)
-                autoUpdater.stop()
-
-                // Stop the instance enforcer BEFORE stopping instances so it doesn't
-                // see the count drop below minimum and auto-spawn new ones.
-                if (mainConfiguration.isMasterNode) {
-                    val enforcer = injector.getInstance(InstanceCountEnforcer::class.java)
-                    enforcer.stop()
-                }
-
-                // Stop local instances (needs Hazelcast)
-                println("  ${Ansi.BLUE}→${Ansi.RESET} Stopping local instances...")
-                val nodeShutdownService = injector.getInstance(NodeShutdownService::class.java)
-                nodeShutdownService.stopAllLocalInstances()
-
-                // Shutdown Hazelcast last
-                println("  ${Ansi.BLUE}→${Ansi.RESET} Shutting down Hazelcast cluster...")
-                try {
-                    hzService.hzInstance.shutdown()
-                } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
-                    // Already shut down
-                }
-                println("  ${Ansi.GREEN}✓${Ansi.RESET} Universe shutdown complete")
-            } catch (e: Exception) {
-                println("  ${Ansi.RED}✗${Ansi.RESET} Error during shutdown: ${e.message}")
-                e.printStackTrace()
-            }
+            shutdown()
         }, "universe-shutdown"))
 
         if (mainConfiguration.isMasterNode) {
@@ -143,6 +114,87 @@ class UniverseApplication {
 
             val enforcer = injector.getInstance(InstanceCountEnforcer::class.java)
             enforcer.start()
+        }
+    }
+
+    /**
+     * Performs a graceful shutdown of the entire node.
+     * Called by the CLI `stop` command, signal handlers, and the JVM shutdown hook.
+     * Guarded by [isShuttingDown] so it only executes once.
+     */
+    fun shutdown() {
+        if (isShuttingDown) return
+        synchronized(this) {
+            if (isShuttingDown) return
+            isShuttingDown = true
+        }
+
+        try {
+            // Stop the console first so JLine terminal is closed cleanly
+            // and stdout/stderr are restored to their originals.
+            commandBootstrap.stop()
+
+            // Use println directly to bypass JLine entirely during shutdown
+            println("  ${Ansi.BLUE}→${Ansi.RESET} Shutting down Universe...")
+
+            // Stop background services first so they don't race with Hazelcast
+            println("  ${Ansi.BLUE}→${Ansi.RESET} Stopping background services...")
+            val healthMonitor = injector.getInstance(InstanceHealthMonitor::class.java)
+            healthMonitor.stop()
+            val autoUpdater = injector.getInstance(AutoUpdaterService::class.java)
+            autoUpdater.stop()
+
+            // Stop the instance enforcer BEFORE stopping instances so it doesn't
+            // see the count drop below minimum and auto-spawn new ones.
+            if (mainConfiguration.isMasterNode) {
+                val enforcer = injector.getInstance(InstanceCountEnforcer::class.java)
+                enforcer.stop()
+            }
+
+            // Stop local instances (needs Hazelcast)
+            println("  ${Ansi.BLUE}→${Ansi.RESET} Stopping local instances...")
+            val nodeShutdownService = injector.getInstance(NodeShutdownService::class.java)
+            nodeShutdownService.stopAllLocalInstances()
+
+            // Shutdown Hazelcast last
+            println("  ${Ansi.BLUE}→${Ansi.RESET} Shutting down Hazelcast cluster...")
+            try {
+                hzService.hzInstance.shutdown()
+            } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
+                // Already shut down
+            }
+            println("  ${Ansi.GREEN}✓${Ansi.RESET} Universe shutdown complete")
+        } catch (e: Exception) {
+            println("  ${Ansi.RED}✗${Ansi.RESET} Error during shutdown: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * Registers signal handlers for SIGTERM (Docker `docker compose down`) and SIGINT (Ctrl+C)
+     * so they trigger the same graceful shutdown path as the CLI `stop` command.
+     */
+    private fun registerSignalHandlers() {
+        try {
+            val signalClass = Class.forName("sun.misc.Signal")
+            val handlerClass = Class.forName("sun.misc.SignalHandler")
+            val handleMethod = signalClass.getMethod("handle", signalClass, handlerClass)
+
+            val handler = java.lang.reflect.Proxy.newProxyInstance(
+                handlerClass.classLoader,
+                arrayOf(handlerClass)
+            ) { _, _, _ ->
+                shutdown()
+                Runtime.getRuntime().exit(0)
+                null
+            }
+
+            // SIGTERM — sent by Docker on `docker compose down`
+            handleMethod.invoke(null, signalClass.getConstructor(String::class.java).newInstance("TERM"), handler)
+            // SIGINT — Ctrl+C in attached terminal
+            handleMethod.invoke(null, signalClass.getConstructor(String::class.java).newInstance("INT"), handler)
+        } catch (_: Exception) {
+            // Signal API not available — fallback to shutdown hook only
         }
     }
 

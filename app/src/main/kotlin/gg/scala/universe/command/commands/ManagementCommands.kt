@@ -2,6 +2,8 @@ package gg.scala.universe.command.commands
 
 import com.google.inject.Inject
 import com.google.inject.Singleton
+import gg.scala.universe.app.UniverseApplication
+import gg.scala.universe.console.Ansi
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.command.CommandSource
@@ -490,7 +492,8 @@ class ManagementCommands @Inject constructor(
 
     @Command("stop|exit")
     suspend fun stop(source: CommandSource) {
-        delay(250)
+        source.sendMessage("  ${Ansi.BLUE}→${Ansi.RESET} Stopping Universe...")
+        UniverseApplication.instance.shutdown()
         Runtime.getRuntime().exit(0)
     }
 
