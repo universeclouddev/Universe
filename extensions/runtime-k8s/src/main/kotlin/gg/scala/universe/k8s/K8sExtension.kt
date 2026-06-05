@@ -11,6 +11,7 @@ class K8sExtension : Extension {
 
     override fun id(): String = "runtime-k8s"
     override fun version(): String = "1.0.0"
+    override fun reloadable(): Boolean = false
 
     @Inject
     private lateinit var runtimeRegistry: RuntimeRegistry

@@ -10,6 +10,7 @@ class DockerExtension : Extension {
 
     override fun id(): String = "runtime-docker"
     override fun version(): String = "1.0.0"
+    override fun reloadable(): Boolean = false
 
     @Inject
     private lateinit var runtimeRegistry: RuntimeRegistry
