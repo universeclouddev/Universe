@@ -478,12 +478,21 @@ class ManagementCommands @Inject constructor(
         source.sendMessage("=== Extensions (${installed.size} installed, ${loaded.size} loaded) ===")
         installed.forEach { (id, ext) ->
             val status = if (loaded.containsKey(id)) "[LOADED]" else "[INSTALLED]"
-            source.sendMessage("  $status $id v${ext.version()}")
+            val flags = buildList {
+                if (ext.masterOnly()) add("master-only")
+                if (!ext.reloadable()) add("no-reload")
+            }.joinToString(prefix = " ", separator = ", ").ifBlank { "" }
+            source.sendMessage("  $status $id v${ext.version()}$flags")
         }
     }
 
     @Command("extension|extensions reload")
     fun extensionReload(source: CommandSource) {
+        val loaded = extensionService.getLoadedExtensions()
+        val skipped = loaded.filter { !it.value.reloadable() }.keys
+        if (skipped.isNotEmpty()) {
+            source.sendMessage("  ${Ansi.YELLOW}⚠${Ansi.RESET} Skipped non-reloadable extension(s): ${skipped.joinToString()}")
+        }
         extensionService.reloadExtensions()
         source.sendMessage("Extensions reloaded.")
     }

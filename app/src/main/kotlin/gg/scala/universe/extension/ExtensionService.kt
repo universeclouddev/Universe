@@ -5,11 +5,13 @@ import com.google.inject.Inject
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.app.UniverseApplication
+import gg.scala.universe.config.UniverseMainConfiguration
 import okio.Path.Companion.toPath
 
 class ExtensionService {
 
     @Inject private lateinit var app: UniverseApplication
+    @Inject private lateinit var configuration: UniverseMainConfiguration
 
     private val extensionPath = "./extensions".toPath().toNioPath()
 
@@ -30,22 +32,37 @@ class ExtensionService {
     }
 
     fun loadExtensions() {
-        this.extensions.forEach { try {
-            it.value.onLoad()
-            this.loadedExtensions[it.key] = it.value
-        } catch (ex: Exception) {
-            log("Failed to load extension ${it.key}: ${ex.message}", LogLevel.ERROR)
-            log(ex.message ?: "Unknown error", LogLevel.ERROR)
-        } }
+        this.extensions.forEach { (id, extension) ->
+            // Skip master-only extensions on non-master nodes
+            if (extension.masterOnly() && !configuration.isMasterNode) {
+                log("Skipping extension '$id' — master-only, not loading on wrapper node", LogLevel.DEBUG)
+                return@forEach
+            }
+
+            try {
+                extension.onLoad()
+                this.loadedExtensions[id] = extension
+            } catch (ex: Exception) {
+                log("Failed to load extension $id: ${ex.message}", LogLevel.ERROR)
+                log(ex.message ?: "Unknown error", LogLevel.ERROR)
+            }
+        }
     }
 
     fun reloadExtensions() {
-        this.loadedExtensions.forEach { try {
-            it.value.onReload()
-        } catch (ex: Exception) {
-            log("Failed to reload extension ${it.key}: ${ex.message}", LogLevel.ERROR)
-            log(ex.message ?: "Unknown error", LogLevel.ERROR)
-        } }
+        this.loadedExtensions.forEach { (id, extension) ->
+            if (!extension.reloadable()) {
+                log("Skipping reload of extension '$id' — not reloadable", LogLevel.WARNING)
+                return@forEach
+            }
+
+            try {
+                extension.onReload()
+            } catch (ex: Exception) {
+                log("Failed to reload extension $id: ${ex.message}", LogLevel.ERROR)
+                log(ex.message ?: "Unknown error", LogLevel.ERROR)
+            }
+        }
     }
 
     fun unloadExtensions() {
