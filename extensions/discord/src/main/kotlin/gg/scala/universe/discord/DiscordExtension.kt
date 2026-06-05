@@ -35,6 +35,7 @@ class DiscordExtension : Extension {
 
     override fun id(): String = "discord"
     override fun version(): String = "0.0.1"
+    override fun masterOnly(): Boolean = true
 
     override fun onLoad() {
         config = loadConfig()
