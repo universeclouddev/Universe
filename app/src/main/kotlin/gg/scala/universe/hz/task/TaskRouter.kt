@@ -80,6 +80,17 @@ class TaskRouter @Inject constructor(
             replaced
         }
 
+        // Resolve template variables in hostAddress BEFORE passing to runtime provider.
+        // Docker/K8s runtimes need the actual IP for port binding, not raw placeholders.
+        val resolvedHostAddress = run {
+            var addr = configuration.hostAddress
+            variables.forEach { (placeholder, replacement) ->
+                addr = addr.replace(placeholder, replacement)
+            }
+            addr
+        }
+        val resolvedConfiguration = configuration.copy(hostAddress = resolvedHostAddress)
+
         val processHandle = try {
             runtimeProvider.start(
                 instanceId = task.instanceId,
@@ -88,7 +99,7 @@ class TaskRouter @Inject constructor(
                 command = configuration.command,
                 ramMB = configuration.ramMB,
                 cpu = configuration.cpu,
-                configuration = configuration,
+                configuration = resolvedConfiguration,
                 environmentVariables = envVars,
             )
         } catch (e: Exception) {
@@ -117,17 +128,9 @@ class TaskRouter @Inject constructor(
             return
         }
 
-        // Resolve the actual host address (runtime may override, e.g. K8s pod IP).
-        // Also apply template variable replacement to configuration.hostAddress so
-        // placeholders like %TAILSCALE_IP% are resolved for screen/tmux runtimes.
-        val resolvedHostAddress = runtimeProvider.getHostAddress(task.instanceId)
-            .ifBlank {
-                var addr = configuration.hostAddress
-                variables.forEach { (placeholder, replacement) ->
-                    addr = addr.replace(placeholder, replacement)
-                }
-                addr
-            }
+        // Runtime may override the resolved host address (e.g. K8s pod IP).
+        val finalHostAddress = runtimeProvider.getHostAddress(task.instanceId)
+            .ifBlank { resolvedHostAddress }
 
         // Update instance info in Hazelcast
         val existing = clusterStateService.getInstance(task.instanceId)
@@ -137,7 +140,7 @@ class TaskRouter @Inject constructor(
                     state = InstanceState.ONLINE,
                     allocatedPort = allocatedPort,
                     processPid = processHandle.pid(),
-                    hostAddress = resolvedHostAddress,
+                    hostAddress = finalHostAddress,
                     runtime = configuration.runtime
                 )
             )
