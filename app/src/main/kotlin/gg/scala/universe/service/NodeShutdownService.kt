@@ -12,6 +12,7 @@ import gg.scala.universe.schema.InstanceState
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.Comparator
+import java.util.concurrent.CompletableFuture
 
 /**
  * Gracefully stops all instances running on the local node.
@@ -55,62 +56,65 @@ class NodeShutdownService @Inject constructor(
             return
         }
 
-        log("Stopping ${localInstances.size} local instance(s)...")
+        log("Stopping ${localInstances.size} local instance(s) in parallel...")
 
-        for (instance in localInstances) {
-            val config = try {
-                clusterStateService.getConfiguration(instance.configurationName)
-            } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
-                null
-            }
-            // Use the runtime stored at instance creation time so config reloads
-            // don't cause us to stop instances with the wrong provider.
-            val runtimeKey = instance.runtime
-            val runtimeProvider = runtimeRegistry.get(runtimeKey)
-                ?: runtimeRegistry.getAll().values.firstOrNull()
-
-            if (runtimeProvider != null) {
-                try {
-                    runtimeProvider.stop(instance.id)
-                    log("Stopped instance ${instance.id} (runtime=$runtimeKey)")
-                } catch (e: Exception) {
-                    log("Failed to stop instance ${instance.id}: ${e.message}", LogLevel.WARNING)
+        val futures = localInstances.map { instance ->
+            CompletableFuture.runAsync {
+                val config = try {
+                    clusterStateService.getConfiguration(instance.configurationName)
+                } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
+                    null
                 }
-            }
+                // Use the runtime stored at instance creation time so config reloads
+                // don't cause us to stop instances with the wrong provider.
+                val runtimeKey = instance.runtime
+                val runtimeProvider = runtimeRegistry.get(runtimeKey)
+                    ?: runtimeRegistry.getAll().values.firstOrNull()
 
-            // Release port
-            portAllocator.release(instance.allocatedPort)
-
-            // Release node resources
-            try {
-                clusterStateService.removeNodeResources(localNodeId, instance.allocatedRamMB, instance.allocatedCpu)
-            } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
-                // Hazelcast down — resources will be cleaned up on next startup
-            }
-
-            // Clean up working directory for non-static instances
-            if (config?.static != true) {
-                val workingDir = Paths.get("./running/${instance.id}").toAbsolutePath().normalize()
-                try {
-                    if (Files.exists(workingDir)) {
-                        Files.walk(workingDir)
-                            .sorted(Comparator.reverseOrder())
-                            .forEach { Files.deleteIfExists(it) }
-                        log("Cleaned up working directory for instance ${instance.id}")
+                if (runtimeProvider != null) {
+                    try {
+                        runtimeProvider.stop(instance.id)
+                        log("Stopped instance ${instance.id} (runtime=$runtimeKey)")
+                    } catch (e: Exception) {
+                        log("Failed to stop instance ${instance.id}: ${e.message}", LogLevel.WARNING)
                     }
-                } catch (cleanupEx: Exception) {
-                    log("Failed to clean up working directory for instance ${instance.id}: ${cleanupEx.message}", LogLevel.WARNING)
                 }
-            }
 
-            // Mark as STOPPED
-            try {
-                clusterStateService.updateInstanceState(instance.id, InstanceState.STOPPED)
-            } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
-                // Hazelcast down — state will be reconciled on next startup
+                // Release port
+                portAllocator.release(instance.allocatedPort)
+
+                // Release node resources
+                try {
+                    clusterStateService.removeNodeResources(localNodeId, instance.allocatedRamMB, instance.allocatedCpu)
+                } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
+                    // Hazelcast down — resources will be cleaned up on next startup
+                }
+
+                // Clean up working directory for non-static instances
+                if (config?.static != true) {
+                    val workingDir = Paths.get("./running/${instance.id}").toAbsolutePath().normalize()
+                    try {
+                        if (Files.exists(workingDir)) {
+                            Files.walk(workingDir)
+                                .sorted(Comparator.reverseOrder())
+                                .forEach { Files.deleteIfExists(it) }
+                            log("Cleaned up working directory for instance ${instance.id}")
+                        }
+                    } catch (cleanupEx: Exception) {
+                        log("Failed to clean up working directory for instance ${instance.id}: ${cleanupEx.message}", LogLevel.WARNING)
+                    }
+                }
+
+                // Mark as STOPPED
+                try {
+                    clusterStateService.updateInstanceState(instance.id, InstanceState.STOPPED)
+                } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
+                    // Hazelcast down — state will be reconciled on next startup
+                }
             }
         }
 
+        CompletableFuture.allOf(*futures.toTypedArray()).join()
         log("All local instances stopped", LogLevel.SUCCESS)
     }
 }
