@@ -39,7 +39,7 @@ class InstanceCountEnforcer @Inject constructor(
 
         executor.scheduleAtFixedRate(
             ::enforce,
-            5,   // initial delay
+            15,   // initial delay
             5,   // period
             TimeUnit.SECONDS
         )
