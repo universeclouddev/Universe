@@ -43,7 +43,6 @@ class DockerRuntimeProvider(
         cpu: Int,
         configuration: gg.scala.universe.schema.Configuration,
         environmentVariables: Map<String, String>?,
-        additionalPorts: List<gg.scala.universe.schema.AdditionalPort>
     ): ProcessHandle {
         val containerName = "universe-$instanceId"
 
@@ -60,10 +59,19 @@ class DockerRuntimeProvider(
         val portBindings = Ports()
 
 
+        // Determine the bind IP from configuration. Only bind to 0.0.0.0 if explicitly requested.
+        val bindIp = configuration.hostAddress.takeIf { it.isNotBlank() } ?: "127.0.0.1"
+        val bindToAll = bindIp == "0.0.0.0"
+
         // Always bind the allocated port (maps host port to same container port)
         val allocatedExposed = ExposedPort.tcp(port)
         exposedPorts.add(allocatedExposed)
-        portBindings.bind(allocatedExposed, Ports.Binding.bindPort(port))
+        val allocatedBinding = if (bindToAll) {
+            Ports.Binding.bindPort(port)
+        } else {
+            Ports.Binding.bindIpAndPort(bindIp, port)
+        }
+        portBindings.bind(allocatedExposed, allocatedBinding)
 
         // Add extra exposed ports from config
         config.exposedPorts.forEach { ep ->
@@ -77,14 +85,19 @@ class DockerRuntimeProvider(
         }
 
         // Add additional ports from the instance configuration (e.g. voice chat, metrics)
-        additionalPorts.forEach { ap ->
+        configuration.additionalPorts.forEach { ap ->
             val exposed = if (ap.protocol.equals("udp", ignoreCase = true)) {
                 ExposedPort.udp(ap.port)
             } else {
                 ExposedPort.tcp(ap.port)
             }
             exposedPorts.add(exposed)
-            portBindings.bind(exposed, Ports.Binding.bindPort(ap.port))
+            val additionalBinding = if (bindToAll) {
+                Ports.Binding.bindPort(ap.port)
+            } else {
+                Ports.Binding.bindIpAndPort(bindIp, ap.port)
+            }
+            portBindings.bind(exposed, additionalBinding)
             log("Docker container '$containerName' additional port: ${ap.port}/${ap.protocol}${if (ap.name.isNotBlank()) " (${ap.name})" else ""}")
         }
 
