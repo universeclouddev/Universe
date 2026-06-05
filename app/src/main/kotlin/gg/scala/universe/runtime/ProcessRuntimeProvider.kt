@@ -27,7 +27,6 @@ class ProcessRuntimeProvider : RuntimeProvider {
         cpu: Int,
         configuration: gg.scala.universe.schema.Configuration,
         environmentVariables: Map<String, String>?,
-        additionalPorts: List<gg.scala.universe.schema.AdditionalPort>
     ): ProcessHandle {
         if (command.isBlank()) {
             throw IllegalArgumentException("Command is blank for instance $instanceId")

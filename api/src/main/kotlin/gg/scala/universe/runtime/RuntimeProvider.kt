@@ -36,7 +36,6 @@ interface RuntimeProvider {
         cpu: Int,
         configuration: Configuration,
         environmentVariables: Map<String, String>? = null,
-        additionalPorts: List<gg.scala.universe.schema.AdditionalPort> = emptyList()
     ): ProcessHandle
 
     /**
