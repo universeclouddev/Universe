@@ -10,7 +10,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
-import io.ktor.http.content.streamProvider
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
@@ -23,6 +22,8 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import io.ktor.utils.io.toByteArray
+import java.nio.file.NoSuchFileException
 import java.util.zip.ZipInputStream
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
@@ -103,11 +104,11 @@ fun Application.configureTemplateRoutes(
                                 "overwrite" -> overwrite = part.value.toBooleanStrictOrNull() ?: true
                             }
                             is PartData.FileItem -> if (part.name == "file") {
-                                zipBytes = part.streamProvider().readBytes()
+                                zipBytes = part.provider().toByteArray()
                             }
                             else -> {}
                         }
-                        part.dispose()
+                        part.release()
                     }
 
                     if (group.isNullOrBlank() || name.isNullOrBlank() || zipBytes == null) {
@@ -118,8 +119,8 @@ fun Application.configureTemplateRoutes(
                     }
 
                     try {
-                        ZipInputStream(zipBytes!!.inputStream()).use { zis ->
-                            templateManager.importTemplateZip(group!!, name!!, zis, overwrite)
+                        ZipInputStream(zipBytes.inputStream()).use { zis ->
+                            templateManager.importTemplateZip(group, name, zis, overwrite)
                         }
                         call.respond(HttpStatusCode.OK, mapOf(
                             "message" to "Template imported",
