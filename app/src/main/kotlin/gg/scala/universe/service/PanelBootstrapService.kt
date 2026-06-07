@@ -10,7 +10,7 @@ import gg.scala.universe.schema.ApiPermission
 import java.util.UUID
 
 /**
- * Ensures a dedicated ALL-permission API key exists for the admin panel.
+ * Ensures a dedicated ALL-permission API key exists for Planet Panel.
  * Created automatically on first master start so users never run `key create` manually.
  */
 @Singleton
@@ -25,7 +25,7 @@ class PanelBootstrapService @Inject constructor(
         val token = generateToken()
         val apiKey = ApiKey(PANEL_KEY_ID, token, ApiPermission.ALL)
         database.saveApiKey(apiKey)
-        log("Created panel API key (id: $PANEL_KEY_ID) for the admin UI")
+        log("Created panel API key (id: $PANEL_KEY_ID) for Planet Panel")
         return apiKey
     }
 

@@ -48,8 +48,9 @@ bin/
 .built/
 .tmp/
 
-### Panel (lives in Panel-Andrew / Panel-Andrew-Monorepo repos) ###
+### Planet Panel (separate project; not tracked in this repo) ###
 panel/
+planet/
 node_modules/
 package-lock.json
 

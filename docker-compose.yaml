@@ -1,6 +1,6 @@
 services:
 
-  # Universe master (panel runs separately — see Panel-Andrew repo)
+  # Universe master (Planet Panel runs separately)
   universe:
     image: git.lunarlabs.dev/scala/universe:latest
     ports:

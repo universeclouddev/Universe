@@ -54,13 +54,14 @@ Requires **JDK 25+** and Gradle 9.5+.
 
 Artifacts are copied to `.built/` after build.
 
-### Admin Panel
+### Planet Panel
 
-The Next.js 16 admin panel lives in separate repositories ([Panel-Andrew](https://github.com/universeclouddev/Panel-Andrew), [Panel-Andrew-Monorepo](https://github.com/universeclouddev/Panel-Andrew-Monorepo)). It connects to the Universe master REST/WebSocket API for instance management, cluster monitoring, configuration editing, and live console access.
+Planet Panel is a Next.js 16 web UI maintained as a separate project. It connects to the Universe master REST/WebSocket API for instance management, cluster monitoring, configuration editing, and live console access.
+
+For local development, check out Planet Panel alongside this repository (typically as `planet/`; `panel/` is also ignored during the transition):
 
 ```bash
-git clone https://github.com/universeclouddev/Panel-Andrew.git panel
-cd panel
+cd planet
 npm install
 npm run dev   # http://localhost:3000
 ```
