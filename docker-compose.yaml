@@ -1,28 +1,15 @@
 services:
 
-  # Universe
+  # Universe master (panel runs separately — see Panel-Andrew repo)
   universe:
     image: git.lunarlabs.dev/scala/universe:latest
     ports:
-      - "127.0.0.1:6000:6000" # Map host port 6000 to container port 6000
-      - "127.0.0.1:7000:7000" # Map host port 7000 to container port 7000
+      - "127.0.0.1:6000:6000" # Hazelcast
+      - "127.0.0.1:7000:7000" # REST API
     volumes:
-      - ./data:/data # Mount local folder to container
+      - ./data:/data
     environment:
       - TERM=xterm-256color
     restart: unless-stopped
     tty: true
     stdin_open: true
-
-  # Universe Admin Panel (Next.js)
-  panel:
-    build:
-      context: ./panel
-    ports:
-      - "127.0.0.1:3000:3000"
-    environment:
-      - NEXT_PUBLIC_DEFAULT_API_URL=http://localhost:7000
-      - UNIVERSE_API_URL=http://universe:7000
-    depends_on:
-      - universe
-    restart: unless-stopped

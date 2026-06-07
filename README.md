@@ -56,15 +56,16 @@ Artifacts are copied to `.built/` after build.
 
 ### Admin Panel
 
-A Next.js 16 web panel lives in [`panel/`](panel/). It connects to the Universe master REST/WebSocket API for instance management, cluster monitoring, configuration editing, and live console access.
+The Next.js 16 admin panel lives in separate repositories ([Panel-Andrew](https://github.com/universeclouddev/Panel-Andrew), [Panel-Andrew-Monorepo](https://github.com/universeclouddev/Panel-Andrew-Monorepo)). It connects to the Universe master REST/WebSocket API for instance management, cluster monitoring, configuration editing, and live console access.
 
 ```bash
+git clone https://github.com/universeclouddev/Panel-Andrew.git panel
 cd panel
 npm install
 npm run dev   # http://localhost:3000
 ```
 
-See [`panel/README.md`](panel/README.md) for setup, API key requirements, and Docker usage.
+Use `GET /api/panel/bootstrap` on the Universe master to obtain the panel API token and cluster metadata during first-time setup.
 
 ### Modules
 
