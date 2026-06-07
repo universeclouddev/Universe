@@ -147,6 +147,7 @@ subprojects {
 
 
 fun RepositoryHandler.configureScalaRepository(dev: Boolean = false) {
+    if (!project.hasProperty("artifactory_contextUrl")) return
     maven("${property("artifactory_contextUrl")}/gradle-${if (dev) "dev" else "release"}") {
         name = "scala"
         credentials {

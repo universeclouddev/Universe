@@ -506,7 +506,7 @@ class ManagementCommands @Inject constructor(
         Runtime.getRuntime().exit(0)
     }
 
-    @Command("help")
+    @Command("help|commands")
     fun help(source: CommandSource) {
         source.sendMessage("=== Universe Commands ===")
         source.sendMessage("")
@@ -544,7 +544,7 @@ class ManagementCommands @Inject constructor(
         source.sendMessage("  extensions reload       - Reload extensions")
         source.sendMessage("")
         source.sendMessage("System:")
-        source.sendMessage("  help                    - Show this help")
+        source.sendMessage("  help|commands           - Show this help")
         source.sendMessage("  stop                    - Shutdown Universe")
     }
 

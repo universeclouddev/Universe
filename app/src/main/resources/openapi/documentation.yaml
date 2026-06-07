@@ -15,17 +15,22 @@ info:
     - **PUBLIC** — Read-only access to public endpoints (instance info, logs, live-log)
     
     ## Rate Limiting
-    Public API keys are rate-limited (default: 100 calls per 60 seconds). 
+    Public API keys are rate-limited (default: 100 calls per 10 seconds). 
     Admin keys (ALL permission) bypass rate limits entirely.
     
     ## WebSocket Endpoints
-    WebSocket connections require the same `Authorization: Bearer TOKEN` header during the handshake.
+    WebSocket connections require Bearer token authentication during the handshake.
+    For browser clients that cannot set custom headers, pass the token as a query parameter:
+    ```
+    ws://host/api/console?token=YOUR_API_KEY
+    ws://host/api/instances/{id}/live-log?token=YOUR_API_KEY
+    ```
   version: 1.0.0
   contact:
     name: Universe Team
 servers:
-  - url: http://localhost:8080/api
-    description: Local development server
+  - url: http://localhost:7000
+    description: Local development server (default apiPort)
 paths:
   /ping:
     get:
@@ -69,12 +74,39 @@ paths:
               schema:
                 type: object
                 properties:
-                  nodeId:
+                  id:
                     type: string
-                  uptime:
+                  clusterName:
                     type: string
-                  systemStats:
+                  version:
+                    type: string
+                  master:
+                    type: boolean
+                  address:
+                    type: string
+                  port:
+                    type: integer
+                  apiPort:
+                    type: integer
+                  uptimeMs:
+                    type: integer
+                    format: int64
+                  system:
                     type: object
+                    properties:
+                      availableProcessors:
+                        type: integer
+                      systemLoadAverage:
+                        type: number
+                      freeMemory:
+                        type: integer
+                        format: int64
+                      totalMemory:
+                        type: integer
+                        format: int64
+                      maxMemory:
+                        type: integer
+                        format: int64
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -133,12 +165,19 @@ paths:
                 items:
                   type: object
                   properties:
-                    nodeId:
+                    id:
                       type: string
+                      description: Hazelcast member UUID
+                    name:
+                      type: string
+                      description: Human-readable node name
                     address:
                       type: string
-                    master:
+                    port:
+                      type: integer
+                    local:
                       type: boolean
+                      description: Whether this is the current node
                     resources:
                       $ref: '#/components/schemas/NodeResources'
         '401':
@@ -165,26 +204,32 @@ paths:
               schema:
                 type: object
                 properties:
-                  nodeId:
+                  id:
+                    type: string
+                  name:
                     type: string
                   address:
                     type: string
-                  master:
+                  port:
+                    type: integer
+                  local:
                     type: boolean
                   instances:
                     type: array
                     items:
-                      $ref: '#/components/schemas/InstanceInfo'
+                      type: string
+                    description: Instance IDs hosted on this node
                   resources:
                     $ref: '#/components/schemas/NodeResources'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /cluster/nodes/{id}/command:
     post:
       summary: Execute a command on a node
       description: |
         Executes a console command on the specified node.
-        - If `id` is the current node: runs locally (not yet implemented)
+        - If `id` is the current node: use `/api/commands/execute` instead
         - If `id` is a remote node: dispatches via Hazelcast (not yet implemented)
       operationId: executeNodeCommand
       security:
@@ -211,7 +256,7 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: Cannot execute command on local node via API
+                    example: Use /api/commands/execute for local node
         '501':
           description: Remote node command execution not yet implemented
         '401':
@@ -615,6 +660,37 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /templates/{group}/{name}/export:
+    get:
+      summary: Export template as zip
+      description: Downloads the template directory as a zip archive for cross-node import.
+      operationId: exportTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Zip archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Template not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /templates/{group}/{name}:
     get:
       summary: Get template details
@@ -679,6 +755,146 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /templates/variables:
+    get:
+      summary: List template variables
+      description: Returns placeholder variables available for template file editing.
+      operationId: listTemplateVariables
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Variable list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  variables:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                        description:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /templates/import:
+    post:
+      summary: Import template from zip
+      description: Multipart upload (group, name, file) extracting a zip into ./templates/
+      operationId: importTemplate
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                group:
+                  type: string
+                name:
+                  type: string
+                overwrite:
+                  type: boolean
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Import successful
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /templates/{group}/{name}/files:
+    get:
+      summary: List template files
+      operationId: listTemplateFiles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File listing
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /templates/{group}/{name}/files/content:
+    get:
+      summary: Read template file
+      operationId: readTemplateFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File content
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      summary: Write template file
+      operationId: writeTemplateFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path, content]
+              properties:
+                path:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Saved
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /commands/execute:
     post:
       summary: Execute a console command
@@ -728,6 +944,25 @@ paths:
       responses:
         '101':
           description: WebSocket connection established
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /extensions:
+    get:
+      summary: List installed extensions
+      description: Returns all discovered Universe extensions with load status.
+      operationId: listExtensions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of extensions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExtensionInfo'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1068,6 +1303,31 @@ components:
           example: help
       required:
         - command
+
+    ExtensionInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Extension identifier
+          example: runtime-docker
+        version:
+          type: string
+          example: "1.0.0"
+        status:
+          type: string
+          enum: [LOADED, INSTALLED, SKIPPED]
+          description: LOADED if active, SKIPPED if master-only on a wrapper node
+        masterOnly:
+          type: boolean
+        reloadable:
+          type: boolean
+      required:
+        - id
+        - version
+        - status
+        - masterOnly
+        - reloadable
 
   responses:
     Unauthorized:

@@ -14,6 +14,9 @@ data class UniverseMainConfiguration(
 
     val debug: Boolean = false,
 
+    /** When true, GET /api/panel/bootstrap exposes the panel API key for zero-config local setup. */
+    val allowPanelBootstrap: Boolean = true,
+
     /** Maximum RAM (in MB) this node is allowed to allocate to instances. */
     val maxRamMB: Int = 8192,
     /** Maximum CPU units this node is allowed to allocate to instances. */

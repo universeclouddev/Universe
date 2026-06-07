@@ -84,16 +84,9 @@ class ApiKeyAwareSlidingWindowRateLimiter(
     private val timestamps = ConcurrentHashMap<String, MutableList<Long>>()
 
     fun tryAccept(call: ApplicationCall, cache: ApiKeyCache): RateLimitResult {
-        // Read Authorization header directly (onCall runs before auth interceptor)
-        val authHeader = call.request.headers[HttpHeaders.Authorization]
-        if (authHeader == null || !authHeader.startsWith("Bearer ", ignoreCase = true)) {
-            return RateLimitResult.Unauthenticated
-        }
-
-        val token = authHeader.substringAfter("Bearer ", "")
-        if (token.isBlank()) {
-            return RateLimitResult.Unauthenticated
-        }
+        // Read token directly (onCall runs before auth interceptor)
+        val token = call.extractBearerToken()
+            ?: return RateLimitResult.Unauthenticated
 
         val apiKey = cache.getByToken(token)
             ?: return RateLimitResult.Unauthenticated

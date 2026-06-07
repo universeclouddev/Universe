@@ -13,3 +13,16 @@ services:
     restart: unless-stopped
     tty: true
     stdin_open: true
+
+  # Universe Admin Panel (Next.js)
+  panel:
+    build:
+      context: ./panel
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NEXT_PUBLIC_DEFAULT_API_URL=http://localhost:7000
+      - UNIVERSE_API_URL=http://universe:7000
+    depends_on:
+      - universe
+    restart: unless-stopped

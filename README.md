@@ -4,44 +4,44 @@ A single-JAR orchestrator for deploying and managing application instances acros
 
 ## Features
 
-- **Master/Wrapper Cluster** — One Master node exposes a REST API; any number of Wrapper nodes execute instances via Hazelcast task dispatch.
-- **Template-Based Deployment** — Instances are created from templates (file trees) with dynamic variable replacement.
-- **Pluggable Runtimes** — Built-in `screen` and `tmux` runtimes; Docker and Kubernetes support via extensions.
-- **Remote Template Storage** — S3-backed template storage extension for centralized template management.
-- **Mesh Networking** — Tailscale extension exposes mesh-network IPs as template variables for cross-node connectivity.
-- **Console & REST Commands** — Full command system accessible via console or HTTP API.
-- **Single Fat JAR** — Master and Wrapper run from the same JAR; node type is determined by configuration.
-- **GitOps & ArgoCD** — Sync templates from Git; export Kubernetes manifests for ArgoCD tracking.
+- **Master/Wrapper Cluster** â€” One Master node exposes a REST API; any number of Wrapper nodes execute instances via Hazelcast task dispatch.
+- **Template-Based Deployment** â€” Instances are created from templates (file trees) with dynamic variable replacement.
+- **Pluggable Runtimes** â€” Built-in `screen` and `tmux` runtimes; Docker and Kubernetes support via extensions.
+- **Remote Template Storage** â€” S3-backed template storage extension for centralized template management.
+- **Mesh Networking** â€” Tailscale extension exposes mesh-network IPs as template variables for cross-node connectivity.
+- **Console & REST Commands** â€” Full command system accessible via console or HTTP API.
+- **Single Fat JAR** â€” Master and Wrapper run from the same JAR; node type is determined by configuration.
+- **GitOps & ArgoCD** â€” Sync templates from Git; export Kubernetes manifests for ArgoCD tracking.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Master Node                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
-│  │  Ktor REST  │  │   Hazelcast │  │   Console Commands  │ │
-│  │    API      │  │   IMap/Exec │  │   (Cloud v2)        │ │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
-│         │                │                    │             │
-│         ▼                ▼                    ▼             │
-│  POST /api/instances  DeployInstanceTask   instance create │
-│  PUT /api/instances   StopInstanceTask     instance stop   │
-│  POST /api/commands   TemplateSyncTask     template sync   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ Hazelcast Cluster
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       Wrapper Node(s)                       │
-│  ┌─────────────┐  ┌─────────────┐  ┌──────────────────────┐ │
-│  │ TaskRouter  │  │  Template   │  │  RuntimeProvider     │ │
-│  │ (IExecutor) │  │   Manager   │  │ (screen/tmux/docker) │ │
-│  └─────────────┘  └─────────────┘  └──────────────────────┘ │
-│         │                │                    │             │
-│         ▼                ▼                    ▼             │
-│   Receive Tasks    Copy Templates      Start Processes      │
-│   Route Actions    Replace Variables   Pipe Stdin           │
-└─────────────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                        Master Node                          â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”‚
+â”‚  â”‚  Ktor REST  â”‚  â”‚   Hazelcast â”‚  â”‚   Console Commands  â”‚ â”‚
+â”‚  â”‚    API      â”‚  â”‚   IMap/Exec â”‚  â”‚   (Cloud v2)        â”‚ â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â”‚
+â”‚         â”‚                â”‚                    â”‚             â”‚
+â”‚         â–¼                â–¼                    â–¼             â”‚
+â”‚  POST /api/instances  DeployInstanceTask   instance create â”‚
+â”‚  PUT /api/instances   StopInstanceTask     instance stop   â”‚
+â”‚  POST /api/commands   TemplateSyncTask     template sync   â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                              â”‚
+                              â”‚ Hazelcast Cluster
+                              â–¼
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                       Wrapper Node(s)                       â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”‚
+â”‚  â”‚ TaskRouter  â”‚  â”‚  Template   â”‚  â”‚  RuntimeProvider     â”‚ â”‚
+â”‚  â”‚ (IExecutor) â”‚  â”‚   Manager   â”‚  â”‚ (screen/tmux/docker) â”‚ â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â”‚
+â”‚         â”‚                â”‚                    â”‚             â”‚
+â”‚         â–¼                â–¼                    â–¼             â”‚
+â”‚   Receive Tasks    Copy Templates      Start Processes      â”‚
+â”‚   Route Actions    Replace Variables   Pipe Stdin           â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ## Building
@@ -53,6 +53,18 @@ Requires **JDK 25+** and Gradle 9.5+.
 ```
 
 Artifacts are copied to `.built/` after build.
+
+### Admin Panel
+
+A Next.js 16 web panel lives in [`panel/`](panel/). It connects to the Universe master REST/WebSocket API for instance management, cluster monitoring, configuration editing, and live console access.
+
+```bash
+cd panel
+npm install
+npm run dev   # http://localhost:3000
+```
+
+See [`panel/README.md`](panel/README.md) for setup, API key requirements, and Docker usage.
 
 ### Modules
 
@@ -89,15 +101,40 @@ Artifacts are copied to `.built/` after build.
 The `loader` module produces a fat JAR with all dependencies embedded or downloaded at runtime.
 
 ```bash
-java -jar .built/universe-loader-0.0.1.jar
+java -jar loader/build/libs/universe.jar
 ```
 
+**Windows:** use the `process` runtime (not `screen`/`tmux`). Helper scripts:
+
+```cmd
+run-universe.cmd
+```
+
+```bash
+./run-universe.sh
+```
+
+```bash
+./stop-universe.sh   # stop process listening on port 6000
+```
+
+**Git Bash `JAVA_HOME`** (PowerShell: `$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-25.0.2.10-hotspot"`):
+
+```bash
+export JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-25.0.2.10-hotspot"
+export PATH="$JAVA_HOME/bin:$PATH"
+```
+
+If port **6000** is in use, Universe is already running — use `stop` in its console, `./stop-universe.sh`, or `taskkill //PID <pid> //F` (Git Bash).
+
+JDK **25** is required. On Windows, instance configs default to `"runtime": "process"` and `"minimumServiceCount": 0` until templates and `server.jar` are ready.
+
 On first run, the following files/directories are created:
-- `./config.json` — Node identity and cluster configuration
-- `./configuration/` — Instance configuration files (`.json`)
-- `./templates/` — Template storage (`<group>/<name>/`)
-- `./running/` — Active instance working directories
-- `./extensions/` — Extension JARs and configs
+- `./config.json` â€” Node identity and cluster configuration
+- `./configuration/` â€” Instance configuration files (`.json`)
+- `./templates/` â€” Template storage (`<group>/<name>/`)
+- `./running/` â€” Active instance working directories
+- `./extensions/` â€” Extension JARs and configs
 
 ### Configuration
 
@@ -318,19 +355,19 @@ When an instance is created, `TemplateManager`:
 2. Copies them to `./running/<instance-id>/` in priority order
 3. Scans files listed in `Configuration.fileModifications`
 4. Replaces built-in variables:
-   - `%PORT%` — allocated instance port
-   - `%INSTANCE_ID%` — 6-character instance ID
-   - `%MASTER_IP%` / `%MASTER_ADDRESS%` — master node address
-   - `%MASTER_PORT%` — master Hazelcast port
-   - `%MASTER_API_PORT%` — master REST API port
-   - `%NODE_ID%` — local node ID
-   - `%HOST_ADDRESS%` — local host address (or runtime-specific override)
-   - `%CONFIGURATION_NAME%` — configuration name
+   - `%PORT%` â€” allocated instance port
+   - `%INSTANCE_ID%` â€” 6-character instance ID
+   - `%MASTER_IP%` / `%MASTER_ADDRESS%` â€” master node address
+   - `%MASTER_PORT%` â€” master Hazelcast port
+   - `%MASTER_API_PORT%` â€” master REST API port
+   - `%NODE_ID%` â€” local node ID
+   - `%HOST_ADDRESS%` â€” local host address (or runtime-specific override)
+   - `%CONFIGURATION_NAME%` â€” configuration name
 5. Replaces extension-provided variables:
    - **K8s runtime**: `%NAMESPACE%`, `%SERVICE_DNS%`, `%POD_NAME%`
    - **Tailscale**: `%TAILSCALE_IP%`, `%TAILSCALE_MAGIC_DNS%`, `%TAILSCALE_HOSTNAME%`
 6. Replaces custom variables from `Configuration.properties`:
-   - Each entry `{ "myKey": "myValue" }` becomes `%myKey%` → `myValue`
+   - Each entry `{ "myKey": "myValue" }` becomes `%myKey%` â†’ `myValue`
 
 **Template sync between nodes:**
 ```bash
@@ -344,28 +381,28 @@ template sync * node-2            # sync all templates
 Extensions are self-registering JARs placed in `./extensions/`.
 
 **Runtime extensions:**
-- `runtime-docker` — Docker container runtime
-- `runtime-k8s` — Kubernetes Pod runtime
-- `tailscale` — Mesh-network IP template variables
+- `runtime-docker` â€” Docker container runtime
+- `runtime-k8s` â€” Kubernetes Pod runtime
+- `tailscale` â€” Mesh-network IP template variables
 
 **Storage extensions:**
-- `storage-s3` — AWS S3 template storage
+- `storage-s3` â€” AWS S3 template storage
 
 **Database extensions:**
-- `db-postgres` — PostgreSQL database provider
-- `db-mongodb` — MongoDB database provider
-- `db-redis` — Redis database provider
+- `db-postgres` â€” PostgreSQL database provider
+- `db-mongodb` â€” MongoDB database provider
+- `db-redis` â€” Redis database provider
 
 **Metrics extensions:**
-- `metrics-prometheus` — Prometheus metrics export (`/api/metrics`)
-- `metrics-influxdb` — InfluxDB metrics export
+- `metrics-prometheus` â€” Prometheus metrics export (`/api/metrics`)
+- `metrics-influxdb` â€” InfluxDB metrics export
 
 **DevOps extensions:**
-- `gitops` — Sync templates and configs from Git
-- `argocd` — Export Kubernetes manifests for ArgoCD
+- `gitops` â€” Sync templates and configs from Git
+- `argocd` â€” Export Kubernetes manifests for ArgoCD
 
 **Integration extensions:**
-- `discord` — Discord bot for cluster management
+- `discord` â€” Discord bot for cluster management
 
 **Extension structure:**
 ```kotlin
@@ -391,7 +428,7 @@ s3 download server/base    # download template from S3
 
 Universe provides first-class Minecraft integration through a standalone `:minecraft:api` module and three platform-specific plugins.
 
-### `:minecraft:api` — Plugin Developer API
+### `:minecraft:api` â€” Plugin Developer API
 
 - **JVM 8 compatible**, zero external dependencies
 - Provides `UniverseAPI` with `InstanceManager`, `ConfigurationManager`, and `TemplateManager`
@@ -456,13 +493,13 @@ The plugin resolves the Master REST API URL from (in priority order):
 If the Minecraft server runs in a container or pod and the Master is on a different network, set the env var to a reachable address:
 
 ```bash
-# Docker Compose → containerized server
+# Docker Compose â†’ containerized server
 -e UNIVERSE_MASTER_URL=http://host.docker.internal:6000
 
-# Kubernetes pod → external Master
+# Kubernetes pod â†’ external Master
 -e UNIVERSE_MASTER_URL=http://my-game-host.example.com:6000
 
-# Kubernetes pod → in-cluster Master Service
+# Kubernetes pod â†’ in-cluster Master Service
 -e UNIVERSE_MASTER_URL=http://universe-master-service:6000
 ```
 
@@ -483,9 +520,9 @@ Shadow JARs are output to `.built/`.
 
 Universe's `PortAllocator` checks three sources before assigning a port:
 
-1. **Local in-memory allocations** — ports already assigned by this JVM instance
-2. **Cluster-wide active instances** — queries Hazelcast for all `ONLINE`/`CREATING` instances and skips their ports
-3. **OS-level availability** — attempts a `ServerSocket` bind + TCP connect probe to catch services already listening on the machine
+1. **Local in-memory allocations** â€” ports already assigned by this JVM instance
+2. **Cluster-wide active instances** â€” queries Hazelcast for all `ONLINE`/`CREATING` instances and skips their ports
+3. **OS-level availability** â€” attempts a `ServerSocket` bind + TCP connect probe to catch services already listening on the machine
 
 This prevents port conflicts even when multiple configurations share overlapping ranges or when external services occupy ports.
 
@@ -493,9 +530,9 @@ This prevents port conflicts even when multiple configurations share overlapping
 
 By default, instances advertise `hostAddress` from their configuration. For nodes on different networks, use:
 
-- **Tailscale extension** — set `hostAddress: "%TAILSCALE_IP%"` for encrypted mesh-network connectivity
-- **K8s headless Services** — in-cluster DNS: `universe-<id>.<namespace>.svc.cluster.local`
-- **Public IP / NodePort** — configure `hostAddress` to the node's public IP and use K8s `NodePort` services
+- **Tailscale extension** â€” set `hostAddress: "%TAILSCALE_IP%"` for encrypted mesh-network connectivity
+- **K8s headless Services** â€” in-cluster DNS: `universe-<id>.<namespace>.svc.cluster.local`
+- **Public IP / NodePort** â€” configure `hostAddress` to the node's public IP and use K8s `NodePort` services
 
 ### Proxy Auto-Connect
 

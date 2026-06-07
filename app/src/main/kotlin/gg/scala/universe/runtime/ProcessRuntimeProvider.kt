@@ -38,8 +38,7 @@ class ProcessRuntimeProvider : RuntimeProvider {
         // Build command with resource limit fallback prefix
         val wrappedCommand = CgroupResourceEnforcer.buildFallbackPrefix(ramMB, cpu) + command
 
-        val processBuilder = ProcessBuilder("bash", "-c", wrappedCommand)
-            .directory(workingDir.toFile())
+        val processBuilder = ShellCommand.processBuilder(wrappedCommand, workingDir)
             .redirectOutput(ProcessBuilder.Redirect.to(logOut))
             .redirectError(ProcessBuilder.Redirect.to(logErr))
             .redirectInput(ProcessBuilder.Redirect.PIPE)
@@ -47,6 +46,8 @@ class ProcessRuntimeProvider : RuntimeProvider {
         if (!environmentVariables.isNullOrEmpty()) {
             processBuilder.environment().putAll(environmentVariables)
         }
+
+        inheritJavaHome(processBuilder)
 
         val process = processBuilder.start()
 
@@ -88,5 +89,18 @@ class ProcessRuntimeProvider : RuntimeProvider {
 
     override fun listRunningInstances(): List<String> {
         return processes.keys.toList()
+    }
+
+    /** Propagate JAVA_HOME so `java` in instance commands resolves on Windows. */
+    private fun inheritJavaHome(processBuilder: ProcessBuilder) {
+        val javaHome = System.getenv("JAVA_HOME") ?: return
+        val env = processBuilder.environment()
+        env.putIfAbsent("JAVA_HOME", javaHome)
+        val bin = java.nio.file.Paths.get(javaHome, "bin").toString()
+        val pathKey = env.keys.firstOrNull { it.equals("PATH", ignoreCase = true) } ?: "PATH"
+        val path = env[pathKey] ?: ""
+        if (!path.split(';', ':').any { it.equals(bin, ignoreCase = true) }) {
+            env[pathKey] = if (ShellCommand.isWindows) "$bin;$path" else "$bin:$path"
+        }
     }
 }

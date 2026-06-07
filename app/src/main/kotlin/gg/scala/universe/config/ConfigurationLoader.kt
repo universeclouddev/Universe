@@ -9,6 +9,7 @@ import gg.scala.universe.schema.Configuration
 import gg.scala.universe.schema.PortRange
 import gg.scala.universe.schema.Template
 import gg.scala.universe.schema.TemplateInstallationConfig
+import gg.scala.universe.runtime.ShellCommand
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -71,16 +72,17 @@ object ConfigurationLoader {
     }
 
     private fun createDefaultConfiguration(): Configuration {
+        val runtime = if (ShellCommand.isWindows) "process" else "screen"
         return Configuration(
             name = "lobby",
-            runtime = "screen",
+            runtime = runtime,
             command = "java -XX:MaxRAMPercentage=90.0 -XX:InitialRAMPercentage=75.0 -jar server.jar",
             static = false,
             instanceGroups = listOf("lobby"),
             nodes = listOf("node-1"),
             hostAddress = "127.0.0.1",
             availablePorts = PortRange(25600, 25700),
-            minimumServiceCount = 1,
+            minimumServiceCount = if (ShellCommand.isWindows) 0 else 1,
             environmentVariables = emptyMap(),
             templateInstallationConfig = TemplateInstallationConfig(
                 allOf = listOf(Template(
@@ -89,7 +91,7 @@ object ConfigurationLoader {
                     storage = "local",
                     priority = 1
                 )),
-                allInGroups = listOf("default"),
+                allInGroups = emptyList(),
                 oneOf = emptyList(),
                 oneInGroups = emptyList(),
                 onTemplatePasteOverridePresentFiles = false

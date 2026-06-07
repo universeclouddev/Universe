@@ -10,14 +10,18 @@ import gg.scala.universe.api.plugins.configureLoggingMessages
 import gg.scala.universe.api.plugins.configureSecurity
 import gg.scala.universe.api.routing.configureClusterRoutes
 import gg.scala.universe.api.routing.configureCommandRoutes
-import gg.scala.universe.api.routing.configureClusterRoutes
 import gg.scala.universe.api.routing.configureConfigurationRoutes
+import gg.scala.universe.api.routing.configureExtensionRoutes
 import gg.scala.universe.api.routing.configureInstanceRoutes
 import gg.scala.universe.api.routing.configureMetricsRoutes
 import gg.scala.universe.api.routing.configureNodeRoutes
+import gg.scala.universe.api.routing.configurePanelBootstrapRoutes
+import gg.scala.universe.service.PanelBootstrapService
 import gg.scala.universe.api.routing.configureTemplateRoutes
 import gg.scala.universe.command.CommandProvider
+import gg.scala.universe.command.exception.CommandExceptionHandler
 import gg.scala.universe.config.UniverseMainConfiguration
+import gg.scala.universe.extension.ExtensionService
 import gg.scala.universe.console.log
 import gg.scala.universe.db.DatabaseProvider
 import gg.scala.universe.hz.ClusterStateService
@@ -51,7 +55,10 @@ class KtorServerService @Inject constructor(
     private val templateSyncService: TemplateSyncService,
     private val databaseProvider: DatabaseProvider,
     private val metricsRegistry: MetricsRegistry,
-    private val apiKeyCache: ApiKeyCache
+    private val apiKeyCache: ApiKeyCache,
+    private val panelBootstrapService: PanelBootstrapService,
+    private val commandExceptionHandler: CommandExceptionHandler,
+    private val extensionService: ExtensionService,
 ) {
     private var server: io.ktor.server.engine.EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -67,6 +74,8 @@ class KtorServerService @Inject constructor(
         java.util.logging.Logger.getLogger("io.netty").level = Level.WARNING
 
         log("Starting Ktor REST API on ${configuration.address}:${configuration.apiPort}")
+
+        panelBootstrapService.ensurePanelKey()
 
         server = embeddedServer(
             Netty,
@@ -84,7 +93,10 @@ class KtorServerService @Inject constructor(
                     templateSyncService,
                     databaseProvider,
                     metricsRegistry,
-                    apiKeyCache
+                    apiKeyCache,
+                    panelBootstrapService,
+                    commandExceptionHandler,
+                    extensionService,
                 )
             }
         ).start(wait = false)
@@ -109,7 +121,10 @@ private fun Application.configureServerModule(
     templateSyncService: TemplateSyncService,
     databaseProvider: DatabaseProvider,
     metricsRegistry: MetricsRegistry,
-    apiKeyCache: ApiKeyCache
+    apiKeyCache: ApiKeyCache,
+    panelBootstrapService: PanelBootstrapService,
+    commandExceptionHandler: CommandExceptionHandler,
+    extensionService: ExtensionService,
 ) {
     install(WebSockets) {
         pingPeriod = 15.seconds
@@ -129,7 +144,9 @@ private fun Application.configureServerModule(
     configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, instanceCreationService, apiKeyCache)
     configureConfigurationRoutes(clusterStateService)
     configureClusterRoutes(clusterStateService, hazelcastInstance, taskDispatcher)
-    configureNodeRoutes(configuration, hazelcastInstance, commandProvider)
-    configureTemplateRoutes(clusterStateService, templateManager, templateSyncService)
+    configureNodeRoutes(configuration, hazelcastInstance, commandProvider, apiKeyCache, commandExceptionHandler)
+    configurePanelBootstrapRoutes(configuration, panelBootstrapService)
+    configureTemplateRoutes(clusterStateService, templateManager, templateSyncService, configuration)
     configureMetricsRoutes(metricsRegistry)
+    configureExtensionRoutes(configuration, extensionService)
 }

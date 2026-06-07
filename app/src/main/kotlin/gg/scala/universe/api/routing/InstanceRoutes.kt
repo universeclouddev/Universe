@@ -4,6 +4,8 @@ import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.cluster.Member
 import gg.scala.universe.api.plugins.ApiKeyCache
 import gg.scala.universe.api.plugins.RateLimiting
+import gg.scala.universe.api.plugins.authenticateApiKey
+import gg.scala.universe.api.plugins.closeUnauthorized
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
@@ -111,41 +113,47 @@ fun Application.configureInstanceRoutes(
                         "requestedLines" to lines
                     ))
                 }
+            }
 
-                webSocket("/{id}/live-log") {
-                    val id = call.parameters["id"]
-                    if (id == null) {
-                        close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Missing instance ID"))
-                        return@webSocket
-                    }
+            // WebSocket auth uses ?token= query param for browser clients
+            webSocket("/{id}/live-log") {
+                if (call.authenticateApiKey(apiKeyCache, requireAll = false) == null) {
+                    closeUnauthorized()
+                    return@webSocket
+                }
 
-                    val instance = clusterStateService.getInstance(id)
-                    if (instance == null) {
-                        close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Instance not found"))
-                        return@webSocket
-                    }
+                val id = call.parameters["id"]
+                if (id == null) {
+                    close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Missing instance ID"))
+                    return@webSocket
+                }
 
-                    val logFile = resolveLogFile(instance, clusterStateService)
-                    if (logFile == null || !logFile.exists()) {
-                        outgoing.send(Frame.Text("No logs available for this instance"))
-                        close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "No logs available"))
-                        return@webSocket
-                    }
+                val instance = clusterStateService.getInstance(id)
+                if (instance == null) {
+                    close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Instance not found"))
+                    return@webSocket
+                }
 
-                    val tailer = LogTailer(logFile.toFile())
-                    try {
-                        while (true) {
-                            val newLines = tailer.poll()
-                            newLines.forEach { line ->
-                                outgoing.send(Frame.Text(line))
-                            }
-                            delay(500)
+                val logFile = resolveLogFile(instance, clusterStateService)
+                if (logFile == null || !logFile.exists()) {
+                    outgoing.send(Frame.Text("No logs available for this instance\n"))
+                    close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "No logs available"))
+                    return@webSocket
+                }
+
+                val tailer = LogTailer(logFile.toFile())
+                try {
+                    while (true) {
+                        val newLines = tailer.poll()
+                        newLines.forEach { line ->
+                            outgoing.send(Frame.Text(line))
                         }
-                    } catch (_: Exception) {
-                        // Client disconnected
-                    } finally {
-                        tailer.close()
+                        delay(500)
                     }
+                } catch (_: Exception) {
+                    // Client disconnected
+                } finally {
+                    tailer.close()
                 }
             }
 

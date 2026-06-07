@@ -47,3 +47,35 @@ bin/
 
 .built/
 .tmp/
+
+### Panel ###
+panel/data/
+panel/.env.local
+### Local runtime, secrets, and downloaded deps ###
+libraries/
+data/
+config.json
+database.json
+configuration/
+running/
+templates/
+logs/
+.env
+.env.local
+
+### Generated API docs (swagger-codegen) ###
+docs/
+
+### Local run artifacts ###
+universe-run.log
+universe-run.err
+/package-lock.json
+
+### Panel (monorepo paths) ###
+panel/node_modules/
+panel/.next/
+panel/out/
+panel/data/
+panel/.env.local
+panel/.env
+panel/*.tsbuildinfo

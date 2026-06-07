@@ -66,10 +66,14 @@ object CgroupResourceEnforcer {
     }
 
     /**
-     * Builds a shell command prefix that applies ulimit for memory and nice for CPU priority.
-     * Used as fallback when cgroups are unavailable.
+     * Resource-limit shell prefix for the current OS. Windows has no ulimit/nice in cmd.
      */
     fun buildFallbackPrefix(ramMB: Int, cpu: Int): String {
+        if (ShellCommand.isWindows) return ""
+        return buildLinuxFallbackPrefix(ramMB, cpu)
+    }
+
+    private fun buildLinuxFallbackPrefix(ramMB: Int, cpu: Int): String {
         val parts = mutableListOf<String>()
 
         if (ramMB > 0) {

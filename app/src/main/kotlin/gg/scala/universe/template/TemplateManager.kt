@@ -8,8 +8,10 @@ import gg.scala.universe.schema.Configuration
 import gg.scala.universe.schema.Template
 import gg.scala.universe.schema.TemplateInstallationConfig
 import java.nio.file.Files
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.zip.ZipInputStream
 import kotlin.io.path.copyTo
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
@@ -298,4 +300,110 @@ class TemplateManager @Inject constructor(
     fun getTemplatePath(group: String, name: String): Path {
         return templatesDir.resolve(group).resolve(name)
     }
+
+    /**
+     * Creates an empty local template directory at `./templates/<group>/<name>/`.
+     */
+    fun createTemplate(group: String, name: String): Path {
+        val path = getTemplatePath(group, name)
+        if (path.exists()) {
+            throw IllegalStateException("Template already exists: $group/$name")
+        }
+        path.createDirectories()
+        return path
+    }
+
+    /**
+     * Lists all files and directories within a template (relative paths).
+     */
+    fun listTemplateFiles(group: String, name: String): List<TemplateFileInfo> {
+        val root = getTemplatePath(group, name)
+        if (!root.exists() || !root.isDirectory()) {
+            throw NoSuchFileException(root.toString(), null, "Template not found")
+        }
+
+        val results = mutableListOf<TemplateFileInfo>()
+        Files.walk(root).use { stream ->
+            stream.forEach { path ->
+                if (path == root) return@forEach
+                val relative = root.relativize(path).toString().replace('\\', '/')
+                results.add(
+                    TemplateFileInfo(
+                        path = relative,
+                        type = if (path.isDirectory()) "directory" else "file",
+                        size = if (Files.isRegularFile(path)) Files.size(path) else 0L,
+                    ),
+                )
+            }
+        }
+        return results.sortedBy { it.path }
+    }
+
+    /**
+     * Reads a file inside a template directory.
+     */
+    fun readTemplateFile(group: String, name: String, relativePath: String): String {
+        val file = resolveTemplateFile(group, name, relativePath)
+        if (!file.exists() || file.isDirectory()) {
+            throw NoSuchFileException(file.toString(), null, "File not found")
+        }
+        return file.readText()
+    }
+
+    /**
+     * Writes a file inside a template directory, creating parent directories as needed.
+     */
+    fun writeTemplateFile(group: String, name: String, relativePath: String, content: String) {
+        val file = resolveTemplateFile(group, name, relativePath)
+        file.parent?.createDirectories()
+        file.writeText(content)
+    }
+
+    /**
+     * Extracts a zip archive into `./templates/<group>/<name>/`.
+     */
+    fun importTemplateZip(group: String, name: String, zipInput: ZipInputStream, overwrite: Boolean = true) {
+        val root = getTemplatePath(group, name).toAbsolutePath().normalize()
+        root.createDirectories()
+
+        var entry = zipInput.nextEntry
+        while (entry != null) {
+            if (!entry.isDirectory) {
+                val relative = entry.name.replace('\\', '/').trimStart('/')
+                if (relative.isNotBlank() && !relative.contains("..")) {
+                    val dest = root.resolve(relative).normalize()
+                    if (dest.startsWith(root)) {
+                        dest.parent?.createDirectories()
+                        if (overwrite || !dest.exists()) {
+                            Files.copy(zipInput, dest, StandardCopyOption.REPLACE_EXISTING)
+                        }
+                    }
+                }
+            }
+            zipInput.closeEntry()
+            entry = zipInput.nextEntry
+        }
+    }
+
+    private fun resolveTemplateFile(group: String, name: String, relativePath: String): Path {
+        val root = getTemplatePath(group, name).toAbsolutePath().normalize()
+        if (!root.exists()) {
+            throw NoSuchFileException(root.toString(), null, "Template not found")
+        }
+        val normalized = relativePath.replace('\\', '/').trimStart('/')
+        if (normalized.isBlank() || normalized.contains("..")) {
+            throw IllegalArgumentException("Invalid file path")
+        }
+        val target = root.resolve(normalized).normalize()
+        if (!target.startsWith(root)) {
+            throw IllegalArgumentException("Path traversal denied")
+        }
+        return target
+    }
 }
+
+data class TemplateFileInfo(
+    val path: String,
+    val type: String,
+    val size: Long,
+)
