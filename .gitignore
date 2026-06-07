@@ -1,4 +1,4 @@
-.gradle
+﻿.gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
@@ -48,9 +48,6 @@ bin/
 .built/
 .tmp/
 
-### Panel ###
-panel/data/
-panel/.env.local
 ### Local runtime, secrets, and downloaded deps ###
 libraries/
 data/
@@ -69,13 +66,3 @@ docs/
 ### Local run artifacts ###
 universe-run.log
 universe-run.err
-/package-lock.json
-
-### Panel (monorepo paths) ###
-panel/node_modules/
-panel/.next/
-panel/out/
-panel/data/
-panel/.env.local
-panel/.env
-panel/*.tsbuildinfo
