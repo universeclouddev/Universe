@@ -48,6 +48,11 @@ bin/
 .built/
 .tmp/
 
+### Panel (lives in Panel-Andrew / Panel-Andrew-Monorepo repos) ###
+panel/
+node_modules/
+package-lock.json
+
 ### Local runtime, secrets, and downloaded deps ###
 libraries/
 data/
@@ -55,10 +60,14 @@ config.json
 database.json
 configuration/
 running/
+static/
 templates/
 logs/
 .env
 .env.local
+
+### Runtime extension installs (JARs dropped into ./extensions at deploy time) ###
+/extensions/*.jar
 
 ### Generated API docs (swagger-codegen) ###
 docs/
