@@ -3,7 +3,6 @@ package gg.scala.universe.api.routing
 import com.hazelcast.core.HazelcastInstance
 import com.hazelcast.cluster.Member
 import gg.scala.universe.api.plugins.ApiKeyCache
-import gg.scala.universe.api.plugins.RateLimiting
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
@@ -67,14 +66,8 @@ fun Application.configureInstanceRoutes(
                 }
             }
 
-            // Public (with rate limiting): read-only instance access
-            authenticate("public") {
-                install(RateLimiting) {
-                    rate = 10.seconds
-                    capacity = 100
-                    keyCache = apiKeyCache
-                }
-
+            // All instance endpoints require ALL permission
+            authenticate("protected") {
                 get("/{id}") {
                     val id = call.parameters["id"]
                         ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing instance ID"))
@@ -84,9 +77,7 @@ fun Application.configureInstanceRoutes(
 
                     call.respond(HttpStatusCode.OK, instance)
                 }
-            }
 
-            authenticate("protected") {
                 get("/{id}/logs") {
                     val id = call.parameters["id"]
                         ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing instance ID"))
@@ -155,9 +146,7 @@ fun Application.configureInstanceRoutes(
                         // Client disconnected
                     }
                 }
-            }
 
-            authenticate("protected") {
                 put("/{id}/state") {
                     val id = call.parameters["id"]
                         ?: return@put call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing instance ID"))
@@ -180,10 +169,7 @@ fun Application.configureInstanceRoutes(
 
                     call.respond(HttpStatusCode.OK, updated)
                 }
-            }
 
-            // management operations
-            authenticate("protected") {
                 delete("/{id}") {
                     val id = call.parameters["id"]
                         ?: return@delete call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing instance ID"))

@@ -12,7 +12,7 @@ info:
     
     ## Permissions
     - **ALL** — Full access to all endpoints (admin, instance management, config changes, logs)
-    - **PUBLIC** — Read-only access to public endpoints (instance info)
+    - **PUBLIC** — No instance endpoints are public. All instance operations require ALL permission.
     
     ## Rate Limiting
     Public API keys are rate-limited (default: 100 calls per 60 seconds). 
@@ -266,8 +266,10 @@ paths:
       description: |
         Returns detailed information about an instance.
         
-        **Public Access**: This endpoint is accessible with PUBLIC permission keys.
+        **Requires ALL permission**: This endpoint requires an API key with ALL permission.
       operationId: getInstance
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -285,8 +287,6 @@ paths:
                 $ref: '#/components/schemas/InstanceInfo'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
 
     delete:
       summary: Stop and delete an instance
