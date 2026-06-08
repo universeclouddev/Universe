@@ -336,6 +336,21 @@ class K8sRuntimeProvider(
         }
     }
 
+    override fun getLogs(instanceId: String, lines: Int): List<String> {
+        val podName = podNames[instanceId] ?: return emptyList()
+        val k8s = client ?: return emptyList()
+        return try {
+            k8s.pods().inNamespace(config.namespace).withName(podName)
+                .tailingLines(lines)
+                .log
+                .lines()
+                .filter { it.isNotBlank() }
+        } catch (e: Exception) {
+            log("Failed to get K8s logs for instance $instanceId: ${e.message}", LogLevel.WARNING)
+            emptyList()
+        }
+    }
+
     override fun executeCommand(instanceId: String, command: String) {
         val podName = podNames[instanceId]
             ?: return log("No K8s pod found for instance $instanceId", LogLevel.WARNING)

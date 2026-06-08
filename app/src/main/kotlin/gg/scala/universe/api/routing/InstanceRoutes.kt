@@ -10,6 +10,7 @@ import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.nodeName
 import gg.scala.universe.hz.task.TaskDispatcher
 import gg.scala.universe.schema.InstanceState
+import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.service.InstanceCreationService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -31,10 +32,7 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.coroutines.delay
-import java.io.RandomAccessFile
-import java.nio.file.Path
 import java.nio.file.Paths
-import kotlin.io.path.exists
 import kotlin.time.Duration.Companion.seconds
 
 fun Application.configureInstanceRoutes(
@@ -42,7 +40,8 @@ fun Application.configureInstanceRoutes(
     hazelcastInstance: HazelcastInstance,
     taskDispatcher: TaskDispatcher,
     instanceCreationService: InstanceCreationService,
-    apiKeyCache: ApiKeyCache
+    apiKeyCache: ApiKeyCache,
+    runtimeRegistry: RuntimeRegistry
 ) {
     routing {
         route("/api/instances") {
@@ -86,7 +85,6 @@ fun Application.configureInstanceRoutes(
                     call.respond(HttpStatusCode.OK, instance)
                 }
 
-                //TODO: rework to get logs properly
                 get("/{id}/logs") {
                     val id = call.parameters["id"]
                         ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing instance ID"))
@@ -95,19 +93,22 @@ fun Application.configureInstanceRoutes(
                         ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "Instance not found"))
 
                     val lines = call.request.queryParameters["lines"]?.toIntOrNull() ?: 100
-                    val logFile = resolveLogFile(instance, clusterStateService)
+                    val runtimeProvider = runtimeRegistry.get(instance.runtime)
+                        ?: runtimeRegistry.getAll().values.firstOrNull()
 
-                    if (logFile == null || !logFile.exists()) {
+                    if (runtimeProvider == null) {
+                        return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "Runtime provider not available"))
+                    }
+
+                    val logLines = runtimeProvider.getLogs(id, lines)
+                    if (logLines.isEmpty()) {
                         return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "No logs available for this instance"))
                     }
 
-                    val allLines = logFile.toFile().readLines()
-                    val tail = allLines.takeLast(lines.coerceAtLeast(1))
-
                     call.respond(HttpStatusCode.OK, mapOf(
                         "instanceId" to id,
-                        "lines" to tail,
-                        "totalLines" to allLines.size,
+                        "lines" to logLines,
+                        "totalLines" to logLines.size,
                         "requestedLines" to lines
                     ))
                 }
@@ -125,26 +126,31 @@ fun Application.configureInstanceRoutes(
                         return@webSocket
                     }
 
-                    val logFile = resolveLogFile(instance, clusterStateService)
-                    if (logFile == null || !logFile.exists()) {
-                        outgoing.send(Frame.Text("No logs available for this instance"))
-                        close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "No logs available"))
+                    val runtimeProvider = runtimeRegistry.get(instance.runtime)
+                        ?: runtimeRegistry.getAll().values.firstOrNull()
+
+                    if (runtimeProvider == null) {
+                        outgoing.send(Frame.Text("Runtime provider not available"))
+                        close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Runtime provider not available"))
                         return@webSocket
                     }
 
-                    val tailer = LogTailer(logFile.toFile())
+                    // Poll for new log lines every 500ms
+                    var lastLineCount = 0
                     try {
                         while (true) {
-                            val newLines = tailer.poll()
-                            newLines.forEach { line ->
-                                outgoing.send(Frame.Text(line))
+                            val logLines = runtimeProvider.getLogs(id, 1000)
+                            if (logLines.size > lastLineCount) {
+                                val newLines = logLines.drop(lastLineCount)
+                                newLines.forEach { line ->
+                                    outgoing.send(Frame.Text(line))
+                                }
+                                lastLineCount = logLines.size
                             }
                             delay(500)
                         }
                     } catch (_: Exception) {
                         // Client disconnected
-                    } finally {
-                        tailer.close()
                     }
                 }
             }
@@ -258,47 +264,3 @@ fun Application.configureInstanceRoutes(
 data class CreateInstanceRequest(val configurationName: String)
 data class UpdateStateRequest(val state: String, val lastHeartbeat: Long? = null)
 data class ExecuteOnInstanceRequest(val command: String)
-
-private fun resolveLogFile(instance: gg.scala.universe.schema.InstanceInfo, clusterStateService: ClusterStateService): Path? {
-    val config = clusterStateService.getConfiguration(instance.configurationName)
-    val workingDir = if (config?.static == true) {
-        Paths.get("./static/${instance.configurationName}")
-    } else {
-        Paths.get("./running/${instance.id}")
-    }
-    val stdout = workingDir.resolve("stdout.log")
-    val stderr = workingDir.resolve("stderr.log")
-    return when {
-        stdout.exists() -> stdout
-        stderr.exists() -> stderr
-        else -> null
-    }
-}
-
-private class LogTailer(private val file: java.io.File) {
-    private val raf = RandomAccessFile(file, "r")
-    private var lastPosition = file.length()
-    init { raf.seek(lastPosition) }
-
-    fun poll(): List<String> {
-        val newLines = mutableListOf<String>()
-        val currentLength = file.length()
-        if (currentLength < lastPosition) {
-            // File was truncated, reset to beginning
-            raf.seek(0)
-            lastPosition = 0
-        }
-        if (currentLength > lastPosition) {
-            val bytes = ByteArray((currentLength - lastPosition).toInt())
-            raf.readFully(bytes)
-            val text = String(bytes, Charsets.UTF_8)
-            text.lines().filter { it.isNotEmpty() }.forEach { newLines.add(it) }
-            lastPosition = currentLength
-        }
-        return newLines
-    }
-
-    fun close() {
-        try { raf.close() } catch (_: Exception) {}
-    }
-}

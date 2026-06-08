@@ -42,7 +42,7 @@ jib {
 //            val commitIdFull = git["git.commit.id"].toString()
             val branchName = git["git.branch"].toString()
 
-            setOf("dev", /* commitIdFull, */ branchName, /* "latest" */)
+            setOf("dev", /* commitIdFull, */ branchName, "latest")
         })
 
         auth {

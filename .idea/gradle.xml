@@ -37,6 +37,7 @@
             <option value="$PROJECT_DIR$/extensions/runtime-docker" />
             <option value="$PROJECT_DIR$/extensions/runtime-k8s" />
             <option value="$PROJECT_DIR$/extensions/storage-s3" />
+            <option value="$PROJECT_DIR$/extensions/tailscale" />
             <option value="$PROJECT_DIR$/loader" />
             <option value="$PROJECT_DIR$/minecraft" />
             <option value="$PROJECT_DIR$/minecraft/api" />

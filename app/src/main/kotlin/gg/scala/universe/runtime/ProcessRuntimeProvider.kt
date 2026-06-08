@@ -89,4 +89,18 @@ class ProcessRuntimeProvider : RuntimeProvider {
     override fun listRunningInstances(): List<String> {
         return processes.keys.toList()
     }
+
+    override fun getLogs(instanceId: String, lines: Int): List<String> {
+        val process = processes[instanceId] ?: return emptyList()
+        val workingDir = process.info().commandLine()
+            .map { java.nio.file.Paths.get(it).parent }
+            .orElse(null) ?: return emptyList()
+        val stdout = workingDir.resolve("stdout.log")
+        val stderr = workingDir.resolve("stderr.log")
+        return when {
+            java.nio.file.Files.exists(stdout) -> stdout.toFile().readLines().takeLast(lines)
+            java.nio.file.Files.exists(stderr) -> stderr.toFile().readLines().takeLast(lines)
+            else -> emptyList()
+        }
+    }
 }

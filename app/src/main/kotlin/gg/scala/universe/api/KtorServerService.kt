@@ -23,8 +23,10 @@ import gg.scala.universe.db.DatabaseProvider
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.task.TaskDispatcher
 import gg.scala.universe.metrics.MetricsRegistry
+import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.service.InstanceCreationService
 import gg.scala.universe.template.TemplateManager
+import gg.scala.universe.template.TemplateStorageRegistry
 import gg.scala.universe.template.TemplateSyncService
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -49,9 +51,11 @@ class KtorServerService @Inject constructor(
     private val instanceCreationService: InstanceCreationService,
     private val templateManager: TemplateManager,
     private val templateSyncService: TemplateSyncService,
+    private val templateStorageRegistry: TemplateStorageRegistry,
     private val databaseProvider: DatabaseProvider,
     private val metricsRegistry: MetricsRegistry,
-    private val apiKeyCache: ApiKeyCache
+    private val apiKeyCache: ApiKeyCache,
+    private val runtimeRegistry: RuntimeRegistry
 ) {
     private var server: io.ktor.server.engine.EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -82,9 +86,11 @@ class KtorServerService @Inject constructor(
                     instanceCreationService,
                     templateManager,
                     templateSyncService,
+                    templateStorageRegistry,
                     databaseProvider,
                     metricsRegistry,
-                    apiKeyCache
+                    apiKeyCache,
+                    runtimeRegistry
                 )
             }
         ).start(wait = false)
@@ -107,9 +113,11 @@ private fun Application.configureServerModule(
     instanceCreationService: InstanceCreationService,
     templateManager: TemplateManager,
     templateSyncService: TemplateSyncService,
+    templateStorageRegistry: TemplateStorageRegistry,
     databaseProvider: DatabaseProvider,
     metricsRegistry: MetricsRegistry,
-    apiKeyCache: ApiKeyCache
+    apiKeyCache: ApiKeyCache,
+    runtimeRegistry: RuntimeRegistry
 ) {
     install(WebSockets) {
         pingPeriod = 15.seconds
@@ -126,10 +134,10 @@ private fun Application.configureServerModule(
     configureDocumentation()
 
     configureCommandRoutes(commandProvider)
-    configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, instanceCreationService, apiKeyCache)
+    configureInstanceRoutes(clusterStateService, hazelcastInstance, taskDispatcher, instanceCreationService, apiKeyCache, runtimeRegistry)
     configureConfigurationRoutes(clusterStateService)
     configureClusterRoutes(clusterStateService, hazelcastInstance, taskDispatcher)
     configureNodeRoutes(configuration, hazelcastInstance, commandProvider)
-    configureTemplateRoutes(clusterStateService, templateManager, templateSyncService)
+    configureTemplateRoutes(clusterStateService, templateManager, templateSyncService, templateStorageRegistry)
     configureMetricsRoutes(metricsRegistry)
 }

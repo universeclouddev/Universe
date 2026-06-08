@@ -74,4 +74,13 @@ interface RuntimeProvider {
      * @return The host address (IP or DNS name), or empty string if not applicable.
      */
     fun getHostAddress(instanceId: String): String = ""
+
+    /**
+     * Retrieves the latest log lines for the given instance.
+     *
+     * @param instanceId Unique 6-character identifier for the instance.
+     * @param lines Maximum number of lines to return (default 100).
+     * @return List of log lines, or empty list if not available.
+     */
+    fun getLogs(instanceId: String, lines: Int = 100): List<String> = emptyList()
 }

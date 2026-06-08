@@ -100,6 +100,21 @@ class TmuxRuntimeProvider : RuntimeProvider {
         }
     }
 
+    override fun getLogs(instanceId: String, lines: Int): List<String> {
+        val sessionName = sessionName(instanceId)
+        return try {
+            val process = ProcessBuilder("tmux", "capture-pane", "-p", "-t", sessionName, "-S", "-${lines}")
+                .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+            val output = process.inputStream.bufferedReader().readLines()
+            process.waitFor()
+            output.filter { it.isNotBlank() }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
     private fun sessionName(instanceId: String): String = "universe-$instanceId"
 
     private fun silentExec(vararg command: String) {

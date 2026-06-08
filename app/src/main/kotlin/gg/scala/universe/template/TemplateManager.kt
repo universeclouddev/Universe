@@ -298,4 +298,110 @@ class TemplateManager @Inject constructor(
     fun getTemplatePath(group: String, name: String): Path {
         return templatesDir.resolve(group).resolve(name)
     }
+
+    /**
+     * Lists all files within a local template directory recursively.
+     *
+     * @return List of relative file paths (e.g. "server.properties", "plugins/config.yml").
+     */
+    fun listTemplateFiles(group: String, name: String): List<String> {
+        val dir = getTemplatePath(group, name)
+        if (!dir.exists() || !dir.isDirectory()) return emptyList()
+
+        val files = mutableListOf<String>()
+        Files.walk(dir).use { stream ->
+            stream.filter { !it.isDirectory() }.forEach { file ->
+                files.add(dir.relativize(file).toString().replace("\\", "/"))
+            }
+        }
+        return files
+    }
+
+    /**
+     * Reads the contents of a file within a local template.
+     *
+     * @return File contents as a string, or null if the file doesn't exist.
+     */
+    fun readTemplateFile(group: String, name: String, relativePath: String): String? {
+        val file = getTemplatePath(group, name).resolve(relativePath)
+        return if (file.exists() && !file.isDirectory()) file.readText() else null
+    }
+
+    /**
+     * Writes contents to a file within a local template.
+     * Creates parent directories if needed.
+     *
+     * @return true if the write succeeded.
+     */
+    fun writeTemplateFile(group: String, name: String, relativePath: String, content: String): Boolean {
+        return try {
+            val file = getTemplatePath(group, name).resolve(relativePath)
+            file.parent?.createDirectories()
+            file.writeText(content)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Exports a local template as a zip byte array.
+     *
+     * @return Zip bytes, or null if the template doesn't exist.
+     */
+    fun exportTemplate(group: String, name: String): ByteArray? {
+        val dir = getTemplatePath(group, name)
+        if (!dir.exists() || !dir.isDirectory()) return null
+
+        val baos = java.io.ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(baos).use { zos ->
+            Files.walk(dir).use { stream ->
+                stream.filter { !it.isDirectory() }.forEach { file ->
+                    val relativePath = dir.relativize(file).toString().replace("\\", "/")
+                    zos.putNextEntry(java.util.zip.ZipEntry(relativePath))
+                    java.nio.file.Files.copy(file, zos)
+                    zos.closeEntry()
+                }
+            }
+        }
+        return baos.toByteArray()
+    }
+
+    /**
+     * Imports a template from a zip byte array.
+     * Overwrites existing files.
+     *
+     * @return true if the import succeeded.
+     */
+    fun importTemplate(group: String, name: String, zipBytes: ByteArray): Boolean {
+        return try {
+            val dir = getTemplatePath(group, name)
+            dir.createDirectories()
+
+            java.io.ByteArrayInputStream(zipBytes).use { bais ->
+                java.util.zip.ZipInputStream(bais).use { zis ->
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        if (entry.isDirectory) {
+                            entry = zis.nextEntry
+                            continue
+                        }
+                        // Security: prevent path traversal
+                        val entryName = entry.name.replace("\\", "/")
+                        if (entryName.contains("..") || entryName.startsWith("/")) {
+                            entry = zis.nextEntry
+                            continue
+                        }
+                        val outFile = dir.resolve(entryName)
+                        outFile.parent?.createDirectories()
+                        java.nio.file.Files.copy(zis, outFile, StandardCopyOption.REPLACE_EXISTING)
+                        entry = zis.nextEntry
+                    }
+                }
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
 }

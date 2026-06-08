@@ -217,6 +217,28 @@ class DockerRuntimeProvider(
         return ""
     }
 
+    override fun getLogs(instanceId: String, lines: Int): List<String> {
+        val containerId = containerIds[instanceId] ?: return emptyList()
+        return try {
+            val logStream = dockerClient.logContainerCmd(containerId)
+                .withStdOut(true)
+                .withStdErr(true)
+                .withTail(lines)
+                .exec(object : com.github.dockerjava.api.async.ResultCallback.Adapter<com.github.dockerjava.api.model.Frame>() {
+                    val buffer = StringBuilder()
+                    override fun onNext(frame: com.github.dockerjava.api.model.Frame) {
+                        buffer.append(String(frame.payload, Charsets.UTF_8))
+                    }
+                })
+            logStream.awaitCompletion(5, java.util.concurrent.TimeUnit.SECONDS)
+            logStream.close()
+            logStream.buffer.toString().lines().filter { it.isNotBlank() }
+        } catch (e: Exception) {
+            log("Failed to get Docker logs for instance $instanceId: ${e.message}", LogLevel.WARNING)
+            emptyList()
+        }
+    }
+
     override fun executeCommand(instanceId: String, command: String) {
         val containerId = containerIds[instanceId]
             ?: return log("No Docker container found for instance $instanceId", LogLevel.WARNING)

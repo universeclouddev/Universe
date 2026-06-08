@@ -75,4 +75,16 @@ interface TemplateStorageProvider {
         }
         return true
     }
+
+    /**
+     * Syncs a local template with the remote storage.
+     * Downloads the latest version from remote, overwriting local files.
+     *
+     * @param group The template group name.
+     * @param name The template name.
+     * @return true if sync succeeded.
+     */
+    fun syncTemplate(group: String, name: String): Boolean {
+        return downloadTemplate(group, name)
+    }
 }

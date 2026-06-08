@@ -107,6 +107,23 @@ class ScreenRuntimeProvider : RuntimeProvider {
         }
     }
 
+    override fun getLogs(instanceId: String, lines: Int): List<String> {
+        val sessionName = sessionName(instanceId)
+        val tempFile = java.nio.file.Files.createTempFile("screen-log-", ".txt")
+        return try {
+            val process = ProcessBuilder("screen", "-S", sessionName, "-X", "hardcopy", tempFile.toString())
+                .inheritIO()
+                .start()
+            process.waitFor()
+            val lines = tempFile.toFile().readLines().takeLast(lines)
+            java.nio.file.Files.deleteIfExists(tempFile)
+            lines.filter { it.isNotBlank() }
+        } catch (_: Exception) {
+            java.nio.file.Files.deleteIfExists(tempFile)
+            emptyList()
+        }
+    }
+
     private fun sessionName(instanceId: String): String = "universe-$instanceId"
 
     private fun silentExec(vararg command: String) {
