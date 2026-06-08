@@ -84,7 +84,9 @@ fun Application.configureInstanceRoutes(
 
                     call.respond(HttpStatusCode.OK, instance)
                 }
+            }
 
+            authenticate("protected") {
                 get("/{id}/logs") {
                     val id = call.parameters["id"]
                         ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing instance ID"))
@@ -112,9 +114,7 @@ fun Application.configureInstanceRoutes(
                         "requestedLines" to lines
                     ))
                 }
-            }
 
-            authenticate("protected") {
                 webSocket("/{id}/live-log") {
                     val id = call.parameters["id"]
                     if (id == null) {
