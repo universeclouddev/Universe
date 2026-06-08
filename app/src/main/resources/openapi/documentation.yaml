@@ -11,8 +11,8 @@ info:
     ```
     
     ## Permissions
-    - **ALL** — Full access to all endpoints (admin, instance management, config changes)
-    - **PUBLIC** — Read-only access to public endpoints (instance info, logs, live-log)
+    - **ALL** — Full access to all endpoints (admin, instance management, config changes, live logs)
+    - **PUBLIC** — Read-only access to public endpoints (instance info, logs)
     
     ## Rate Limiting
     Public API keys are rate-limited (default: 100 calls per 60 seconds). 
@@ -324,6 +324,7 @@ paths:
         Works with all runtimes (Docker, K8s, screen, tmux, process).
         
         **Public Access**: This endpoint is accessible with PUBLIC permission keys.
+        Note: Live log WebSocket requires ALL permission.
       operationId: getInstanceLogs
       parameters:
         - name: id
@@ -366,7 +367,7 @@ paths:
       description: |
         Opens a WebSocket connection that streams live log output from the instance.
         
-        **Public Access**: This endpoint is accessible with PUBLIC permission keys.
+        **Requires ALL permission**: This endpoint requires an API key with ALL permission.
         
         Connect with:
         ```
@@ -376,6 +377,8 @@ paths:
         
         Messages are sent as text frames.
       operationId: liveLog
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -387,8 +390,6 @@ paths:
           description: WebSocket connection established
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
 
   /instances/{id}/state:
     put:

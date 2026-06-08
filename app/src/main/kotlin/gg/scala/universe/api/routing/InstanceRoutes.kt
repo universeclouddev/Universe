@@ -112,7 +112,9 @@ fun Application.configureInstanceRoutes(
                         "requestedLines" to lines
                     ))
                 }
+            }
 
+            authenticate("protected") {
                 webSocket("/{id}/live-log") {
                     val id = call.parameters["id"]
                     if (id == null) {
