@@ -321,6 +321,7 @@ paths:
       summary: Get instance logs
       description: |
         Returns the most recent log lines for an instance.
+        Works with all runtimes (Docker, K8s, screen, tmux, process).
         
         **Public Access**: This endpoint is accessible with PUBLIC permission keys.
       operationId: getInstanceLogs
@@ -649,6 +650,241 @@ paths:
                     type: string
                   exists:
                     type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /templates/{group}/{name}/files:
+    get:
+      summary: List template files
+      description: Returns all files within a local template directory.
+      operationId: listTemplateFiles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  group:
+                    type: string
+                  name:
+                    type: string
+                  files:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /templates/{group}/{name}/files/{path}:
+    get:
+      summary: Get file contents
+      description: Returns the contents of a specific file within a template.
+      operationId: getTemplateFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          description: Relative file path (e.g. server.properties)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File contents
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: File not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      summary: Edit file contents
+      description: Updates the contents of a file within a local template.
+      operationId: patchTemplateFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          description: Relative file path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: File updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  path:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /templates/{group}/{name}/export:
+    post:
+      summary: Export template as zip
+      description: Exports a local template as a zip file.
+      operationId: exportTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Zip file
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Template not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /templates/{group}/{name}/import:
+    post:
+      summary: Import template from zip
+      description: Imports a template from a zip file, overwriting existing files.
+      operationId: importTemplate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Import successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  group:
+                    type: string
+                  name:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /templates/{group}/{name}/sync:
+    post:
+      summary: Sync template from storage provider
+      description: Downloads the latest version of a template from a remote storage provider.
+      operationId: syncTemplateFromStorage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StorageSyncRequest'
+      responses:
+        '200':
+          description: Sync successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  group:
+                    type: string
+                  name:
+                    type: string
+                  storage:
+                    type: string
+        '400':
+          description: Storage provider not found
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1058,6 +1294,16 @@ components:
           example: default/*
       required:
         - pattern
+
+    StorageSyncRequest:
+      type: object
+      properties:
+        storage:
+          type: string
+          description: Storage provider key (e.g. s3, ftp)
+          example: s3
+      required:
+        - storage
 
     ExecuteCommandRequest:
       type: object
