@@ -770,6 +770,90 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+    post:
+      summary: Create new file
+      description: Creates a new file within a local template. Fails if the file already exists.
+      operationId: createTemplateFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          description: Relative file path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        '201':
+          description: File created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  path:
+                    type: string
+        '409':
+          description: File already exists
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      summary: Delete file
+      description: Deletes a file within a local template.
+      operationId: deleteTemplateFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: path
+          in: path
+          required: true
+          description: Relative file path
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  path:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /templates/{group}/{name}/export:
     post:
       summary: Export template as zip

@@ -345,6 +345,41 @@ class TemplateManager @Inject constructor(
     }
 
     /**
+     * Creates a new file within a local template.
+     * Fails if the file already exists.
+     *
+     * @return true if the file was created.
+     */
+    fun createTemplateFile(group: String, name: String, relativePath: String, content: String): Boolean {
+        return try {
+            val file = getTemplatePath(group, name).resolve(relativePath)
+            if (file.exists()) return false
+            file.parent?.createDirectories()
+            file.writeText(content)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Deletes a file within a local template.
+     *
+     * @return true if the file was deleted (or didn't exist).
+     */
+    fun deleteTemplateFile(group: String, name: String, relativePath: String): Boolean {
+        return try {
+            val file = getTemplatePath(group, name).resolve(relativePath)
+            if (file.exists() && !file.isDirectory()) {
+                Files.delete(file)
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
      * Exports a local template as a zip byte array.
      *
      * @return Zip bytes, or null if the template doesn't exist.

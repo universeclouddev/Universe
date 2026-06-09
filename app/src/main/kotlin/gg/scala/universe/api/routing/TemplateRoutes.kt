@@ -116,6 +116,49 @@ fun Application.configureTemplateRoutes(
                     }
                 }
 
+                // ─── Create new file ───
+                post("/{group}/{name}/files/{path...}") {
+                    val group = call.parameters["group"]
+                        ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing group"))
+                    val name = call.parameters["name"]
+                        ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing name"))
+                    val relativePath = call.parameters.getAll("path")?.joinToString("/")
+                        ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing file path"))
+
+                    val content = call.receiveText()
+                    val success = templateManager.createTemplateFile(group, name, relativePath, content)
+
+                    if (success) {
+                        call.respond(HttpStatusCode.Created, mapOf(
+                            "message" to "File created",
+                            "path" to relativePath
+                        ))
+                    } else {
+                        call.respond(HttpStatusCode.Conflict, mapOf("error" to "File already exists or failed to create"))
+                    }
+                }
+
+                // ─── Delete file ───
+                delete("/{group}/{name}/files/{path...}") {
+                    val group = call.parameters["group"]
+                        ?: return@delete call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing group"))
+                    val name = call.parameters["name"]
+                        ?: return@delete call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing name"))
+                    val relativePath = call.parameters.getAll("path")?.joinToString("/")
+                        ?: return@delete call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing file path"))
+
+                    val success = templateManager.deleteTemplateFile(group, name, relativePath)
+
+                    if (success) {
+                        call.respond(HttpStatusCode.OK, mapOf(
+                            "message" to "File deleted",
+                            "path" to relativePath
+                        ))
+                    } else {
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Failed to delete file"))
+                    }
+                }
+
                 // ─── Export template as zip ───
                 post("/{group}/{name}/export") {
                     val group = call.parameters["group"]
