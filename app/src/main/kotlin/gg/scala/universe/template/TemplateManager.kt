@@ -350,12 +350,12 @@ class TemplateManager @Inject constructor(
      *
      * @return true if the file was created.
      */
-    fun createTemplateFile(group: String, name: String, relativePath: String, content: String): Boolean {
+    fun createTemplateFile(group: String, name: String, relativePath: String, content: ByteArray): Boolean {
         return try {
             val file = getTemplatePath(group, name).resolve(relativePath)
             if (file.exists()) return false
             file.parent?.createDirectories()
-            file.writeText(content)
+            java.nio.file.Files.write(file, content)
             true
         } catch (_: Exception) {
             false

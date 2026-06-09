@@ -125,7 +125,7 @@ fun Application.configureTemplateRoutes(
                     val relativePath = call.parameters.getAll("path")?.joinToString("/")
                         ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing file path"))
 
-                    val content = call.receiveText()
+                    val content = call.receive<ByteArray>()
                     val success = templateManager.createTemplateFile(group, name, relativePath, content)
 
                     if (success) {

@@ -772,7 +772,9 @@ paths:
 
     post:
       summary: Create new file
-      description: Creates a new file within a local template. Fails if the file already exists.
+      description: |
+        Creates a new file within a local template. Fails if the file already exists.
+        Accepts any content type (text, binary, images, jars, etc.).
       operationId: createTemplateFile
       security:
         - bearerAuth: []
@@ -796,9 +798,10 @@ paths:
       requestBody:
         required: true
         content:
-          text/plain:
+          application/octet-stream:
             schema:
               type: string
+              format: binary
       responses:
         '201':
           description: File created
