@@ -4,7 +4,7 @@
 
 ## YouTrack Ticket
 
-<!-- Reference the YouTrack ticket ID. Format: LUNA-XXX -->
+<!-- Reference the YouTrack ticket ID if avaliable. Format: LUNA-XXX -->
 <!-- Example: LUNA-42 -->
 
 ## Type of Change

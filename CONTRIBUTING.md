@@ -122,13 +122,6 @@ LUNA-1: add template variable replacement for port allocation
 LUNA-3: implement RuntimeProvider interface for Docker extension
 ```
 
-### What NOT to Include
-
-- Never include internal model codenames, unreleased version numbers, or internal repo names
-- Never include "Claude Code" or any AI attribution
-- Never include Co-Authored-By lines or any other attribution
-- Write commit messages as a human developer would — describe only what the code change does
-
 ## Pull Request Process
 
 1. **Create a branch** from `develop` (or `main` for hotfixes)
