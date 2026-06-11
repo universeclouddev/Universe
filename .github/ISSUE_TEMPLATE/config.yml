@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: YouTrack Issue Tracker
+    url: https://youtrack.lunarlabs.dev/
+    about: For internal team tracking and prioritization
+  - name: Discord Community
+    url: https://discord.gg/lunarlabs
+    about: Ask questions and discuss with the community
