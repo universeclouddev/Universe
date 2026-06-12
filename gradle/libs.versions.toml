@@ -6,7 +6,7 @@
 kotlin = "2.4.0"
 shadow = "9.4.2"
 jib = "3.5.3"
-gradle-git-properties = "2.5.7"
+gradle-git-properties = "4.0.1"
 guice = "7.0.0"
 gson = "2.14.0"
 cloud = "2.0.0"
