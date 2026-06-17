@@ -84,11 +84,11 @@ jobs:
 
       - name: Build and push Docker image via Jib
         env:
-          JIB_GHCR_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          JIB_GHCR_USERNAME: ${{ github.actor }}
-          JIB_GHCR_PASSWORD: ${{ secrets.JIB_TOKEN }}
-          JIB_GHCR_TAGS: "latest,${{ needs.build.outputs.version }},${{ github.sha }}"
-        run: ./gradlew :loader:jibGhcr --no-daemon
+          JIB_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          JIB_USERNAME: ${{ github.actor }}
+          JIB_PASSWORD: ${{ secrets.JIB_TOKEN }}
+          JIB_TAGS: "latest,${{ needs.build.outputs.version }},${{ github.sha }}"
+        run: ./gradlew :loader:jib --no-daemon
 
   release:
     name: Create GitHub Release

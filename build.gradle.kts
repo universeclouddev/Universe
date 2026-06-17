@@ -136,7 +136,7 @@ subprojects {
     }
 
     publishing {
-        repositories.configureScalaRepository(dev = branchName != "main")
+        repositories.configureScalaRepository(dev = branchName != "production")
         publications {
             create<MavenPublication>("maven") {
                 from(components["java"])
