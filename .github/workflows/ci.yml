@@ -76,16 +76,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.JIB_TOKEN }}
 
-      - name: Compute short SHA
-        id: vars
-        run: echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
-      # The primary tag lives in JIB_IMAGE so Jib's always-pushed base ref is
-      # ':beta', never ':latest'. ':latest' is reserved for prod (release.yml).
+      # Beta builds publish ONLY ':beta' (no commit SHA, no ':latest').
+      # JIB_TAGS must be set to 'beta' too: an unset JIB_TAGS makes the build
+      # fall back to a default that includes ':latest'. ':latest' is reserved
+      # for prod releases (release.yml).
       - name: Build and push beta image via Jib
         env:
           JIB_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta
           JIB_USERNAME: ${{ github.actor }}
           JIB_PASSWORD: ${{ secrets.JIB_TOKEN }}
-          JIB_TAGS: ${{ steps.vars.outputs.sha_short }}
+          JIB_TAGS: beta
         run: ./gradlew :loader:jib --no-daemon

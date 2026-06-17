@@ -87,7 +87,7 @@ jib {
                     ?.let { "https://github.com/$it" }
                     ?: "https://git.lunarlabs.dev/scala/universe"
                 ),
-            "org.opencontainers.image.description" to "Universe — Single-JAR Orchestrator for Minecraft server infrastructure",
+            "org.opencontainers.image.description" to "Universe — Distributed single-JAR cluster orchestrator",
             "org.opencontainers.image.licenses" to "UNLICENSED"
         )
     }
