@@ -5,7 +5,7 @@ on:
     branches: ["**"]
     tags-ignore: ["v*.*.*"]
   pull_request:
-    branches: ["production"]
+    branches: ["main", "production"]
 
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/production' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/production' }}
 
       - name: Build all modules
         run: ./gradlew assemble --no-daemon
@@ -42,11 +42,14 @@ jobs:
           path: .built/
           retention-days: 7
 
-  push-docker-beta:
-    name: Push Beta Image
+  push-docker:
+    name: Push Image (${{ github.ref_name }})
     needs: build
-    # Beta images publish on production only — never on feature branches or PRs.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/production'
+    # Publish container images on the two mainline branches only:
+    #   main       -> :beta   + :<sha>
+    #   production -> :latest + :<sha>
+    # Never on feature branches, PRs, or tags. ':latest' is production-only.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -76,18 +79,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.JIB_TOKEN }}
 
-      - name: Compute short SHA
+      # Moving tag is 'latest' on production, 'beta' on main. The short SHA is
+      # the immutable base ref (JIB_IMAGE); the moving tag is applied last
+      # (JIB_TAGS) so it reads as the package's main/current tag.
+      - name: Compute tags
         id: vars
-        run: echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF}" = "refs/heads/production" ]; then
+            echo "moving_tag=latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "moving_tag=beta" >> "$GITHUB_OUTPUT"
+          fi
 
-      # Beta builds publish BOTH ':beta' and the short commit SHA, never
-      # ':latest' (reserved for prod releases). The SHA is the immutable base
-      # ref (JIB_IMAGE); 'beta' is applied last as the moving tag (JIB_TAGS) so
-      # it reads as the package's main/current tag.
-      - name: Build and push beta image via Jib
+      - name: Build and push image via Jib
         env:
           JIB_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.sha_short }}
           JIB_USERNAME: ${{ github.actor }}
           JIB_PASSWORD: ${{ secrets.JIB_TOKEN }}
-          JIB_TAGS: beta
+          JIB_TAGS: ${{ steps.vars.outputs.moving_tag }}
         run: ./gradlew :loader:jib --no-daemon
