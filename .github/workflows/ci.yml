@@ -76,13 +76,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.JIB_TOKEN }}
 
-      # Beta builds publish ONLY ':beta' (no commit SHA, no ':latest').
-      # JIB_TAGS must be set to 'beta' too: an unset JIB_TAGS makes the build
-      # fall back to a default that includes ':latest'. ':latest' is reserved
-      # for prod releases (release.yml).
+      - name: Compute short SHA
+        id: vars
+        run: echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # Beta builds publish BOTH ':beta' and the short commit SHA, never
+      # ':latest' (reserved for prod releases). The SHA is the immutable base
+      # ref (JIB_IMAGE); 'beta' is applied last as the moving tag (JIB_TAGS) so
+      # it reads as the package's main/current tag.
       - name: Build and push beta image via Jib
         env:
-          JIB_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta
+          JIB_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.sha_short }}
           JIB_USERNAME: ${{ github.actor }}
           JIB_PASSWORD: ${{ secrets.JIB_TOKEN }}
           JIB_TAGS: beta
