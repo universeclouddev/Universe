@@ -1,0 +1,71 @@
+# Universe — example Docker Compose (single master node)
+#
+# Universe is a single-JAR orchestrator: the master exposes the REST API (:7000)
+# and a Hazelcast cluster port (:6000). The master can run instances itself; extra
+# wrapper nodes can join from other hosts (see the note at the bottom).
+#
+# First run
+#   1. docker compose -f compose.example.yaml up -d
+#   2. Attach to the console and create an API key for your client (e.g. Nova):
+#        docker attach universe        # Ctrl-P Ctrl-Q to detach without stopping
+#        > key create nova ALL
+#      Copy the printed token — that is the client's API key.
+#   3. The REST API is at  http://<host>:7000/api
+#      (e.g. point Nova's UNIVERSE_URL there, including the /api suffix, and use
+#       the key above as UNIVERSE_API_KEY.)
+#
+# Config + state live in ./data — config.json, database.json, ./configuration,
+# templates, logs, and the embedded H2 database. They are created on first boot;
+# edit and restart to change them.
+
+services:
+  universe:
+    container_name: universe
+    # Public image. (Internal builds: git.lunarlabs.dev/scala/universe:latest)
+    image: ghcr.io/universeclouddev/universe:latest
+    restart: unless-stopped
+
+    # Interactive JLine console — keep a TTY + stdin so `docker attach universe`
+    # gives a usable prompt (key create, extension list, node info, …).
+    tty: true
+    stdin_open: true
+
+    # Host networking: Universe binds the dynamic instance ports it allocates and
+    # reaches node-local services (Docker, Tailscale) directly — the simplest
+    # setup for a real node. On host networking a `ports:` list is ignored; 6000
+    # (Hazelcast) and 7000 (REST API) bind straight onto the host.
+    network_mode: host
+    extra_hosts:
+      - 'host.docker.internal:127.0.0.1'
+
+    environment:
+      - TERM=xterm-256color
+      # Only used by the Kubernetes runtime extension (see the kube mount below):
+      - KUBECONFIG=/root/.kube/config
+
+    volumes:
+      # Config + state (config.json, database.json, configuration/, templates,
+      # logs, embedded H2 db).
+      - ./data:/data
+
+      # ── Optional, per runtime/extension — drop the ones you don't use ─────────
+      # Docker runtime: launch instance containers on this host's Docker.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Kubernetes runtime: kubeconfig used to launch instance pods.
+      - ./kube:/root/.kube:ro
+      # Tailscale extension: expose mesh IPs as template variables.
+      - /usr/bin/tailscale:/usr/bin/tailscale:ro
+      - /run/tailscale:/var/run/tailscale
+#
+# ── Bridge networking instead of host ───────────────────────────────────────────
+# If you don't need to bind dynamic instance ports on the host (e.g. a
+# control-plane-only master, or instances running on Kubernetes), drop
+# `network_mode: host` + `extra_hosts` and publish just the two service ports:
+#     ports:
+#       - '7000:7000'   # REST API
+#       - '6000:6000'   # Hazelcast cluster
+#
+# ── Adding wrapper nodes ────────────────────────────────────────────────────────
+# Run the same image on another host with its own ./data whose config.json sets
+# `isMasterNode: false` and `masterAddress` to this master's host/IP (masterPort
+# 6000). See the project README ("Docker Compose" / wrapper config.json).
