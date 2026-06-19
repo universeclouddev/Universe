@@ -1,24 +1,33 @@
-# Universe — example Docker Compose (single master node)
+# Universe + Nova — example Docker Compose (single node)
 #
-# Universe is a single-JAR orchestrator: the master exposes the REST API (:7000)
-# and a Hazelcast cluster port (:6000). The master can run instances itself; extra
-# wrapper nodes can join from other hosts (see the note at the bottom).
+# Runs the Universe master, the Nova web panel, and the Postgres database Nova
+# needs, on one host.
 #
-# First run
-#   1. docker compose -f compose.example.yaml up -d
-#   2. Attach to the console and create an API key for your client (e.g. Nova):
+# Bring-up order (Nova's API key is created at runtime, so it's a two-step start):
+#   1. Create a .env next to this file (see the block at the bottom of this comment)
+#      with POSTGRES_PASSWORD and SESSION_SECRET set.
+#   2. docker compose -f compose.example.yaml up -d universe db
+#   3. Create Nova's API key from the Universe console:
 #        docker attach universe        # Ctrl-P Ctrl-Q to detach without stopping
 #        > key create nova ALL
-#      Copy the printed token — that is the client's API key.
-#   3. The REST API is at  http://<host>:7000/api
-#      (e.g. point Nova's UNIVERSE_URL there, including the /api suffix, and use
-#       the key above as UNIVERSE_API_KEY.)
+#      Paste the printed token into .env as UNIVERSE_API_KEY.
+#   4. docker compose -f compose.example.yaml up -d nova
+#   5. Open http://localhost:${NOVA_PORT:-3000} — Nova's /setup runs on first visit.
 #
-# Config + state live in ./data — config.json, database.json, ./configuration,
-# templates, logs, and the embedded H2 database. They are created on first boot;
-# edit and restart to change them.
+# Networking: Universe uses host networking (it binds the dynamic instance ports
+# it allocates and reaches node-local Docker/Tailscale). Nova + Postgres run on
+# the compose bridge and talk by service name (db:5432); Nova reaches the
+# host-networked Universe via host.docker.internal (Linux: host-gateway).
+#
+# ── example .env ───────────────────────────────────────────────────────────────
+#   POSTGRES_PASSWORD=a-strong-db-password
+#   SESSION_SECRET=replace-with-32+-random-chars       # openssl rand -hex 32
+#   UNIVERSE_API_KEY=                                   # paste the `key create nova ALL` token (step 3)
+#   NOVA_PORT=3000
+# ────────────────────────────────────────────────────────────────────────────────
 
 services:
+  # ── Orchestrator ──────────────────────────────────────────────────────────────
   universe:
     container_name: universe
     # Public image. (Internal builds: git.lunarlabs.dev/scala/universe:latest)
@@ -26,13 +35,12 @@ services:
     restart: unless-stopped
 
     # Interactive JLine console — keep a TTY + stdin so `docker attach universe`
-    # gives a usable prompt (key create, extension list, node info, …).
+    # gives a usable prompt (key create, extension list, …).
     tty: true
     stdin_open: true
 
-    # Host networking: Universe binds the dynamic instance ports it allocates and
-    # reaches node-local services (Docker, Tailscale) directly — the simplest
-    # setup for a real node. On host networking a `ports:` list is ignored; 6000
+    # Host networking: bind dynamic instance ports + reach node-local Docker /
+    # Tailscale directly. On host networking a `ports:` list is ignored; 6000
     # (Hazelcast) and 7000 (REST API) bind straight onto the host.
     network_mode: host
     extra_hosts:
@@ -47,8 +55,7 @@ services:
       # Config + state (config.json, database.json, configuration/, templates,
       # logs, embedded H2 db).
       - ./data:/data
-
-      # ── Optional, per runtime/extension — drop the ones you don't use ─────────
+      # ── Optional, per runtime/extension — drop the ones you don't use ──────────
       # Docker runtime: launch instance containers on this host's Docker.
       - /var/run/docker.sock:/var/run/docker.sock
       # Kubernetes runtime: kubeconfig used to launch instance pods.
@@ -56,16 +63,44 @@ services:
       # Tailscale extension: expose mesh IPs as template variables.
       - /usr/bin/tailscale:/usr/bin/tailscale:ro
       - /run/tailscale:/var/run/tailscale
-#
-# ── Bridge networking instead of host ───────────────────────────────────────────
-# If you don't need to bind dynamic instance ports on the host (e.g. a
-# control-plane-only master, or instances running on Kubernetes), drop
-# `network_mode: host` + `extra_hosts` and publish just the two service ports:
-#     ports:
-#       - '7000:7000'   # REST API
-#       - '6000:6000'   # Hazelcast cluster
-#
-# ── Adding wrapper nodes ────────────────────────────────────────────────────────
-# Run the same image on another host with its own ./data whose config.json sets
-# `isMasterNode: false` and `masterAddress` to this master's host/IP (masterPort
-# 6000). See the project README ("Docker Compose" / wrapper config.json).
+
+  # ── Nova's database ───────────────────────────────────────────────────────────
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nova
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: nova
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nova -d nova']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Nova web panel ────────────────────────────────────────────────────────────
+  nova:
+    image: ghcr.io/universeclouddev/nova:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Bridge networking; reach the host-networked Universe through the host.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    environment:
+      # 32+ char random string — encrypts sessions + stored secrets. Keep it stable.
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      # Postgres owned by this stack (the db service above).
+      DATABASE_URL: postgresql://nova:${POSTGRES_PASSWORD}@db:5432/nova
+      # Universe is host-networked, so reach its REST API via the host (incl. /api).
+      UNIVERSE_URL: http://host.docker.internal:7000/api
+      # The `key create nova ALL` token from step 3 (empty until you set it).
+      UNIVERSE_API_KEY: ${UNIVERSE_API_KEY:-}
+    ports:
+      - '${NOVA_PORT:-3000}:3000'
+
+volumes:
+  pgdata:
