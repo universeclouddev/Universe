@@ -38,6 +38,9 @@ tasks.jib {
 // For CI (ghcr.io): set JIB_IMAGE, JIB_USERNAME, JIB_PASSWORD, JIB_TAGS env vars
 // For local dev: uses default git.lunarlabs.dev registry
 jib {
+    from {
+        image = "amazoncorretto:21"
+    }
     to {
         image = System.getenv("JIB_IMAGE") ?: "git.lunarlabs.dev/scala/universe:dev"
         setTags(provider {
