@@ -1,0 +1,46 @@
+# CODEOWNERS for Universe
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @lunarlabs/core
+
+# Core modules
+/app/ @lunarlabs/core
+/api/ @lunarlabs/core
+/loader/ @lunarlabs/core
+
+# Extension system
+/extensions/extension-api/ @lunarlabs/core @lunarlabs/extensions
+/extensions/runtime-docker/ @lunarlabs/extensions
+/extensions/runtime-k8s/ @lunarlabs/extensions
+/extensions/storage-s3/ @lunarlabs/extensions
+/extensions/db-postgres/ @lunarlabs/extensions
+/extensions/db-mongodb/ @lunarlabs/extensions
+/extensions/db-redis/ @lunarlabs/extensions
+/extensions/metrics-prometheus/ @lunarlabs/extensions
+/extensions/metrics-influxdb/ @lunarlabs/extensions
+/extensions/gitops/ @lunarlabs/extensions
+/extensions/argocd/ @lunarlabs/extensions
+/extensions/discord/ @lunarlabs/extensions
+/extensions/tailscale/ @lunarlabs/extensions
+
+# Minecraft plugins
+/minecraft/minecraft-api/ @lunarlabs/minecraft
+/minecraft/minecraft-modern/ @lunarlabs/minecraft
+/minecraft/minecraft-legacy/ @lunarlabs/minecraft
+/minecraft/minecraft-velocity/ @lunarlabs/minecraft
+/minecraft/minecraft-bungee/ @lunarlabs/minecraft
+/minecraft/minecraft-folia/ @lunarlabs/minecraft
+
+# Build configuration
+/buildSrc/ @lunarlabs/core
+/gradle/ @lunarlabs/core
+build.gradle.kts @lunarlabs/core
+settings.gradle.kts @lunarlabs/core
+gradle.properties @lunarlabs/core
+
+# GitHub configuration
+.github/ @lunarlabs/core
+
+# Documentation
+*.md @lunarlabs/core
