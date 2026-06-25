@@ -7,6 +7,7 @@ import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
 import gg.scala.universe.hz.nodeName
+import gg.scala.universe.hz.ownsInstance
 import gg.scala.universe.hz.task.TaskDispatcher
 import gg.scala.universe.schema.InstanceState
 import gg.scala.universe.runtime.RuntimeRegistry
@@ -178,7 +179,7 @@ fun Application.configureInstanceRoutes(
                         ?: return@delete call.respond(HttpStatusCode.NotFound, mapOf("error" to "Instance not found"))
 
                     val member = hazelcastInstance.cluster.members.firstOrNull {
-                        it.uuid.toString() == instance.wrapperNodeId
+                        it.ownsInstance(instance.wrapperNodeId)
                     } ?: hazelcastInstance.cluster.localMember
 
                     taskDispatcher.dispatchStop(id, member)
@@ -198,7 +199,7 @@ fun Application.configureInstanceRoutes(
                         ?: return@patch call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing 'target' query parameter"))
 
                     val member = hazelcastInstance.cluster.members.firstOrNull {
-                        it.uuid.toString() == instance.wrapperNodeId
+                        it.ownsInstance(instance.wrapperNodeId)
                     } ?: hazelcastInstance.cluster.localMember
 
                     when (target.lowercase()) {
@@ -238,7 +239,7 @@ fun Application.configureInstanceRoutes(
 
                     val request = call.receive<ExecuteOnInstanceRequest>()
                     val member = hazelcastInstance.cluster.members.firstOrNull {
-                        it.uuid.toString() == instance.wrapperNodeId
+                        it.ownsInstance(instance.wrapperNodeId)
                     } ?: hazelcastInstance.cluster.localMember
 
                     taskDispatcher.dispatchExecute(id, request.command, member)
