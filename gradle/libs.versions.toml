@@ -39,6 +39,7 @@ folia = "1.21.8-R0.1-SNAPSHOT"
 bungeecord = "1.21-R0.5-SNAPSHOT"
 jda = "6.4.2"
 cloudDiscord = "1.0.0-beta.4"
+junit = "5.11.4"
 
 [libraries]
 # dependency download
@@ -128,6 +129,10 @@ bungeecord-api = { module = "net.md-5:bungeecord-api", version.ref = "bungeecord
 
 # discord
 jda = { module = "net.dv8tion:JDA", version.ref = "jda" }
+
+# testing
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 
 # other
 

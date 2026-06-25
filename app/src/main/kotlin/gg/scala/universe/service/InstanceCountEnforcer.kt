@@ -62,7 +62,25 @@ class InstanceCountEnforcer @Inject constructor(
         if (shuttingDown) return
         try {
             val configs = clusterStateService.configurations.values
-            val allInstances = clusterStateService.getAllInstances()
+            val initialInstances = clusterStateService.getAllInstances()
+
+            // Watchdog: reap instances stuck in CREATING (lost deploy task, port that never
+            // freed, pod that never became ready) so they stop counting as active and can be
+            // retried on this very tick.
+            val stuck = InstanceLifecyclePolicy.staleCreating(
+                initialInstances, System.currentTimeMillis(), InstanceLifecyclePolicy.CREATING_TIMEOUT_MS
+            )
+            for (instance in stuck) {
+                log(
+                    "Instance ${instance.id} (config=${instance.configurationName}) stuck in CREATING for over " +
+                    "${InstanceLifecyclePolicy.CREATING_TIMEOUT_MS / 1000}s; marking OFFLINE for retry",
+                    LogLevel.WARNING
+                )
+                clusterStateService.updateInstanceState(instance.id, InstanceState.OFFLINE)
+            }
+
+            // Re-read after reaping so the deficit reflects the freed-up slots.
+            val allInstances = if (stuck.isEmpty()) initialInstances else clusterStateService.getAllInstances()
 
             for (config in configs) {
                 if (config.minimumServiceCount <= 0) continue
