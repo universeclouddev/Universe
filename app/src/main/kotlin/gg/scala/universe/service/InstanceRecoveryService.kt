@@ -75,7 +75,8 @@ class InstanceRecoveryService @Inject constructor(
         }
 
         // 3. Check runtime providers for any instances not yet recovered
-        for ((runtimeKey, provider) in runtimeRegistry.getAll()) {
+        var deferredToReconcile = 0
+        for ((_, provider) in runtimeRegistry.getAll()) {
             val instanceIds = provider.listRunningInstances()
             for (id in instanceIds) {
                 if (recovered.contains(id)) continue
@@ -96,10 +97,16 @@ class InstanceRecoveryService @Inject constructor(
                 if (instance != null && verifyAndRegister(instance)) {
                     recovered.add(instance.id)
                 } else {
-                    // Unknown running instance — can't recover without metadata, log and skip
-                    log("Found unknown running instance '$id' via runtime '$runtimeKey', skipping recovery", LogLevel.WARNING)
+                    // No local metadata to recover from. Don't emit a warning per resource —
+                    // reconciliation below is the authority: it adopts the live/ready ones and
+                    // deletes the dead/orphaned ones. Defer silently and summarize once.
+                    deferredToReconcile++
                 }
             }
+        }
+
+        if (deferredToReconcile > 0) {
+            log("Deferring $deferredToReconcile running runtime resource(s) without local state to reconciliation", LogLevel.INFO)
         }
 
         if (recovered.isEmpty()) {

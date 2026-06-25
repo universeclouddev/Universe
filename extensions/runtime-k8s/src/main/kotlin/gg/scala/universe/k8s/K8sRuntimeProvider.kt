@@ -6,6 +6,7 @@ import gg.scala.universe.runtime.AdoptedResource
 import gg.scala.universe.runtime.NodeAllocatable
 import gg.scala.universe.runtime.ReconcileAction
 import gg.scala.universe.runtime.ResourceSnapshot
+import gg.scala.universe.runtime.ResourceOwnership
 import gg.scala.universe.runtime.RuntimeProvider
 import gg.scala.universe.runtime.RuntimeReconcile
 import gg.scala.universe.runtime.RuntimeReconcileReport
@@ -43,11 +44,34 @@ import java.util.stream.Stream
  * via `kubectl exec` equivalent through the Fabric8 client.
  */
 class K8sRuntimeProvider(
-    private val config: K8sConfig
+    private val config: K8sConfig,
+    private val clusterName: String = "",
+    private val nodeId: String = ""
 ) : RuntimeProvider {
 
     private var client: KubernetesClient? = null
     private val podNames = ConcurrentHashMap<String, String>()
+
+    private companion object {
+        // Stable ownership labels. The legacy `app`/`universe-instance-id`/`configuration` labels
+        // are kept alongside these so resources created before this scheme are still discovered.
+        const val LABEL_MANAGED_BY = "app.kubernetes.io/managed-by"
+        const val LABEL_CLUSTER = "universe.cluster"
+        const val LABEL_NODE = "universe.node"
+        const val LABEL_INSTANCE = "universe.instance"
+        const val LABEL_CONFIG = "universe.config"
+        const val LABEL_RUNTIME = "universe.runtime"
+
+        const val LEGACY_LABEL_INSTANCE = "universe-instance-id"
+        const val LEGACY_LABEL_CONFIG = "configuration"
+        const val POD_NAME_PREFIX = "universe-"
+    }
+
+    private fun instanceIdOf(labels: Map<String, String>, name: String?): String? =
+        ResourceOwnership.instanceId(labels, name, LABEL_INSTANCE, LEGACY_LABEL_INSTANCE, POD_NAME_PREFIX)
+
+    private fun ownedByThisCluster(labels: Map<String, String>): Boolean =
+        ResourceOwnership.belongsToCluster(labels, LABEL_CLUSTER, clusterName)
 
     init {
         try {
@@ -85,10 +109,18 @@ class K8sRuntimeProvider(
         removePodIfExists(k8s, namespace, podName)
 
         val labels = mutableMapOf(
+            // Legacy labels (kept for backward-compatible discovery of pre-existing resources).
             "app" to "universe",
-            "universe-instance-id" to instanceId,
-            "configuration" to configuration.name
+            LEGACY_LABEL_INSTANCE to instanceId,
+            LEGACY_LABEL_CONFIG to configuration.name,
+            // Stable ownership labels used for list/adopt/delete scoping.
+            LABEL_MANAGED_BY to "universe",
+            LABEL_INSTANCE to instanceId,
+            LABEL_CONFIG to configuration.name,
+            LABEL_RUNTIME to config.factoryName
         )
+        if (clusterName.isNotBlank()) labels[LABEL_CLUSTER] = clusterName
+        if (nodeId.isNotBlank()) labels[LABEL_NODE] = nodeId
         labels.putAll(config.labels)
 
         val containerBuilder = ContainerBuilder()
@@ -298,7 +330,9 @@ class K8sRuntimeProvider(
                 "(phase=$phase, reason=$reason). Deleting pod+service to release its port.",
                 LogLevel.ERROR
             )
-            deletePodAndService(k8s, namespace, instanceId, podName)
+            // Wait for the pod to actually be gone before returning, so the freed hostPort is
+            // really available when the caller releases the port and a retry reuses it.
+            deletePodServiceAndWait(k8s, namespace, instanceId, podName)
             podNames.remove(instanceId)
 
             throw RuntimeException(
@@ -314,31 +348,21 @@ class K8sRuntimeProvider(
     }
 
     override fun stop(instanceId: String) {
-        val podName = podNames.remove(instanceId) ?: return
         val k8s = client ?: return
+        // Derive the deterministic pod name when the in-memory cache misses — after a restart,
+        // or when a stop races a deploy that has not populated the cache yet — so stop still
+        // deletes the real pod/service instead of silently no-op'ing and leaking them.
+        val podName = podNames.remove(instanceId) ?: "universe-$instanceId"
         val namespace = config.namespace
 
-        // Delete pod (the service follows via ownerReference) plus the service explicitly.
-        deletePodAndService(k8s, namespace, instanceId, podName)
-
-        // Poll until the pod is actually gone so its hostPort is released before the caller
-        // reuses the port. Force-delete if it is still Terminating after the grace window —
-        // a stuck-Terminating pod otherwise holds the hostPort indefinitely.
-        if (!waitForPodGone(k8s, namespace, podName, 60_000L)) {
-            log("Pod '$podName' still terminating after grace window, force deleting...", LogLevel.WARNING)
-            try {
-                k8s.pods().inNamespace(namespace).withName(podName).withGracePeriod(0).delete()
-                waitForPodGone(k8s, namespace, podName, 15_000L)
-            } catch (e: Exception) {
-                log("Failed to force-delete pod '$podName' for instance $instanceId: ${e.message}", LogLevel.ERROR)
-            }
-        }
+        // Delete pod + service and wait for the pod (and its hostPort) to actually be gone.
+        deletePodServiceAndWait(k8s, namespace, instanceId, podName)
         log("Stopped K8s pod '$podName' for instance $instanceId")
     }
 
     override fun getHostAddress(instanceId: String): String {
-        val podName = podNames[instanceId] ?: return ""
         val k8s = client ?: return ""
+        val podName = podNames[instanceId] ?: "universe-$instanceId"
         return try {
             k8s.pods().inNamespace(config.namespace).withName(podName).get()
                 ?.status?.podIP ?: ""
@@ -348,8 +372,8 @@ class K8sRuntimeProvider(
     }
 
     override fun getLogs(instanceId: String, lines: Int): List<String> {
-        val podName = podNames[instanceId] ?: return emptyList()
         val k8s = client ?: return emptyList()
+        val podName = podNames[instanceId] ?: "universe-$instanceId"
         return try {
             k8s.pods().inNamespace(config.namespace).withName(podName)
                 .tailingLines(lines)
@@ -363,9 +387,8 @@ class K8sRuntimeProvider(
     }
 
     override fun executeCommand(instanceId: String, command: String) {
-        val podName = podNames[instanceId]
-            ?: return log("No K8s pod found for instance $instanceId", LogLevel.WARNING)
         val k8s = client ?: return
+        val podName = podNames[instanceId] ?: "universe-$instanceId"
 
         try {
             val commandBytes = (command + "\n").toByteArray()
@@ -384,11 +407,13 @@ class K8sRuntimeProvider(
     }
 
     override fun isRunning(instanceId: String): Boolean {
-        val podName = podNames[instanceId] ?: return false
         val k8s = client ?: return false
+        // Don't depend on the in-memory cache (empty after a restart); the pod name is
+        // deterministic. A pod being deleted (deletionTimestamp set) is not "running".
+        val podName = podNames[instanceId] ?: "universe-$instanceId"
         return try {
             val pod = k8s.pods().inNamespace(config.namespace).withName(podName).get()
-            pod?.status?.phase == "Running"
+            pod?.status?.phase == "Running" && pod.metadata?.deletionTimestamp == null
         } catch (_: Exception) {
             false
         }
@@ -400,9 +425,8 @@ class K8sRuntimeProvider(
             k8s.pods().inNamespace(config.namespace)
                 .withLabel("app", "universe")
                 .list().items
-                .mapNotNull { pod ->
-                    pod.metadata?.labels?.get("universe-instance-id")
-                }
+                .filter { ownedByThisCluster(it.metadata?.labels ?: emptyMap()) }
+                .mapNotNull { pod -> instanceIdOf(pod.metadata?.labels ?: emptyMap(), pod.metadata?.name) }
         } catch (_: Exception) {
             emptyList()
         }
@@ -437,7 +461,10 @@ class K8sRuntimeProvider(
 
         for (pod in pods) {
             val podName = pod.metadata?.name ?: continue
-            val id = pod.metadata?.labels?.get("universe-instance-id")
+            val labels = pod.metadata?.labels ?: emptyMap()
+            // Never touch a pod owned by a different Universe cluster sharing this namespace.
+            if (!ownedByThisCluster(labels)) continue
+            val id = instanceIdOf(labels, podName)
             val snapshot = podSnapshot(pod, now)
             val tracked = id != null && id in trackedInstanceIds
 
@@ -447,7 +474,7 @@ class K8sRuntimeProvider(
                     adopted.add(
                         AdoptedResource(
                             instanceId = id,
-                            configurationName = pod.metadata?.labels?.get("configuration"),
+                            configurationName = labels[LABEL_CONFIG] ?: labels[LEGACY_LABEL_CONFIG],
                             hostAddress = pod.status?.podIP ?: "",
                             port = pod.spec?.containers?.firstOrNull()?.ports?.firstOrNull()?.containerPort ?: 0
                         )
@@ -460,7 +487,9 @@ class K8sRuntimeProvider(
                     val phase = pod.status?.phase ?: "unknown"
                     deletePodAndService(k8s, namespace, id, podName)
                     orphans++
-                    log("K8s reconcile: deleted orphan pod '$podName' (instance '${id ?: "?"}' not tracked, phase=$phase)", LogLevel.WARNING)
+                    // Per-resource detail is DEBUG so a namespace full of leftovers can't spam
+                    // the console with hundreds of lines; the summary below carries the counts.
+                    log("K8s reconcile: deleted orphan pod '$podName' (instance '${id ?: "?"}' not tracked, phase=$phase)", LogLevel.DEBUG)
                 }
                 ReconcileAction.DELETE_DEAD -> {
                     val phase = pod.status?.phase ?: "unknown"
@@ -470,7 +499,7 @@ class K8sRuntimeProvider(
                         dead.add(id)
                         podNames.remove(id)
                     }
-                    log("K8s reconcile: deleted dead pod '$podName' (instance '${id ?: "?"}', phase=$phase)", LogLevel.WARNING)
+                    log("K8s reconcile: deleted dead pod '$podName' (instance '${id ?: "?"}', phase=$phase)", LogLevel.DEBUG)
                 }
             }
         }
@@ -516,7 +545,7 @@ class K8sRuntimeProvider(
     }
 
     private fun podSnapshot(pod: Pod, nowMs: Long): ResourceSnapshot {
-        val id = pod.metadata?.labels?.get("universe-instance-id")
+        val id = instanceIdOf(pod.metadata?.labels ?: emptyMap(), pod.metadata?.name)
         val phase = pod.status?.phase
         val ready = isPodReady(pod)
         val terminating = pod.metadata?.deletionTimestamp != null
@@ -616,8 +645,28 @@ class K8sRuntimeProvider(
     }
 
     /**
-     * Best-effort deletion of both the pod and its service for an instance. Used by [stop],
-     * by the failed-start cleanup path, and by [reconcile].
+     * Deletes the pod+service and blocks until the pod is actually gone, so its hostPort is
+     * released before the caller reuses the port. Force-deletes if the pod is still Terminating
+     * after the grace window — a stuck-Terminating pod otherwise holds the hostPort indefinitely.
+     * Used by [stop] and the failed-start cleanup path. [reconcile] uses the non-waiting variant
+     * so a namespace full of leftovers doesn't serialise hundreds of deletes during startup.
+     */
+    private fun deletePodServiceAndWait(k8s: KubernetesClient, namespace: String, instanceId: String?, podName: String) {
+        deletePodAndService(k8s, namespace, instanceId, podName)
+        if (!waitForPodGone(k8s, namespace, podName, 60_000L)) {
+            log("Pod '$podName' still terminating after grace window, force deleting...", LogLevel.WARNING)
+            try {
+                k8s.pods().inNamespace(namespace).withName(podName).withGracePeriod(0).delete()
+                waitForPodGone(k8s, namespace, podName, 15_000L)
+            } catch (e: Exception) {
+                log("Failed to force-delete pod '$podName'${if (instanceId != null) " for instance $instanceId" else ""}: ${e.message}", LogLevel.ERROR)
+            }
+        }
+    }
+
+    /**
+     * Best-effort deletion of both the pod and its service for an instance. Used by [reconcile]
+     * and as the first step of [deletePodServiceAndWait].
      */
     private fun deletePodAndService(k8s: KubernetesClient, namespace: String, instanceId: String?, podName: String) {
         try {

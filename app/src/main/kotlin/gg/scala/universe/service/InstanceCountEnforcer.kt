@@ -6,6 +6,7 @@ import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.config.UniverseMainConfiguration
 import gg.scala.universe.hz.ClusterStateService
+import gg.scala.universe.runtime.PortAllocator
 import gg.scala.universe.schema.InstanceState
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -22,7 +23,8 @@ import kotlin.math.min
 class InstanceCountEnforcer @Inject constructor(
     private val clusterStateService: ClusterStateService,
     private val instanceCreationService: InstanceCreationService,
-    private val configuration: UniverseMainConfiguration
+    private val configuration: UniverseMainConfiguration,
+    private val portAllocator: PortAllocator
 ) {
     private val executor = Executors.newSingleThreadScheduledExecutor { r ->
         Thread(r, "universe-instance-enforcer").apply { isDaemon = true }
@@ -76,6 +78,9 @@ class InstanceCountEnforcer @Inject constructor(
                     "${InstanceLifecyclePolicy.CREATING_TIMEOUT_MS / 1000}s; marking OFFLINE for retry",
                     LogLevel.WARNING
                 )
+                // Release the port the wedged deploy allocated but never released, otherwise the
+                // in-memory allocation outlives the instance and a fixed range stays exhausted.
+                if (instance.allocatedPort > 0) portAllocator.release(instance.allocatedPort)
                 clusterStateService.updateInstanceState(instance.id, InstanceState.OFFLINE)
             }
 

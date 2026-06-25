@@ -102,6 +102,21 @@ class TaskRouter @Inject constructor(
         }
         val resolvedConfiguration = configuration.copy(hostAddress = resolvedHostAddress)
 
+        // Persist the allocated port and resolved host onto the still-CREATING record now,
+        // before the blocking start(). Two reasons: `instances list` shows the real port
+        // instead of 0 while the deploy is in flight, and — critically — a concurrent stop or
+        // the stale-CREATING watchdog releases instance.allocatedPort, which must be the real
+        // port rather than the 0 sentinel, otherwise the port leaks for the JVM's lifetime.
+        clusterStateService.getInstance(task.instanceId)?.let { existing ->
+            clusterStateService.putInstance(
+                existing.copy(
+                    allocatedPort = allocatedPort,
+                    hostAddress = resolvedHostAddress,
+                    lastHeartbeat = System.currentTimeMillis()
+                )
+            )
+        }
+
         val processHandle = try {
             runtimeProvider.start(
                 instanceId = task.instanceId,
