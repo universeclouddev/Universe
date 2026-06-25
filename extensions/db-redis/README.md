@@ -41,7 +41,7 @@ Create `./database.json`:
 ```yaml
 services:
   universe:
-    image: ghcr.io/universeclouddev/universe:latest
+    image: git.lunarlabs.dev/scala/universe:latest
     volumes:
       - ./data:/data
       - ./database.json:/data/database.json:ro

@@ -169,7 +169,7 @@ Create a `docker-compose.yml`:
 ```yaml
 services:
   universe-master:
-    image: ghcr.io/universeclouddev/universe:latest
+    image: git.lunarlabs.dev/scala/universe:latest
     container_name: universe-master
     stdin_open: true
     tty: true
@@ -181,7 +181,7 @@ services:
 
   # You can also add a wrapper, but the master should be able to run instances on its own
   universe-wrapper:
-    image: ghcr.io/universeclouddev/universe:latest
+    image: git.lunarlabs.dev/scala/universe:latest
     depends_on:
       - universe-master
     volumes:

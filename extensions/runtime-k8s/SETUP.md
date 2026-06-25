@@ -8,7 +8,7 @@ If Universe runs inside Docker Compose (the recommended deployment), it does **n
 
 ```yaml
 universe:
-  image: ghcr.io/universeclouddev/universe:latest
+  image: git.lunarlabs.dev/scala/universe:latest
   ports:
     - "127.0.0.1:6000:6000"
     - "127.0.0.1:7000:7000"

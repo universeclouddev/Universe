@@ -24,6 +24,9 @@ allprojects {
         mavenCentral()
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://repo.mincats.eu/mirrors/")
+
+        configureScalaRepository()
+        configureScalaRepository(dev = true)
     }
 }
 
@@ -48,9 +51,9 @@ subprojects {
     }
 
     kotlin {
-        jvmToolchain(21)
+        jvmToolchain(25)
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_21)
+            jvmTarget.set(JvmTarget.JVM_25)
         }
     }
 
@@ -133,10 +136,22 @@ subprojects {
     }
 
     publishing {
+        repositories.configureScalaRepository(dev = branchName != "main")
         publications {
             create<MavenPublication>("maven") {
                 from(components["java"])
             }
+        }
+    }
+}
+
+
+fun RepositoryHandler.configureScalaRepository(dev: Boolean = false) {
+    maven("${property("artifactory_contextUrl")}/gradle-${if (dev) "dev" else "release"}") {
+        name = "scala"
+        credentials {
+            username = property("artifactory_user").toString()
+            password = property("artifactory_password").toString()
         }
     }
 }

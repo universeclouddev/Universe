@@ -6,7 +6,6 @@ import com.hazelcast.core.HazelcastInstance
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
-import gg.scala.universe.hz.stableNodeId
 import gg.scala.universe.runtime.PortAllocator
 import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.schema.InstanceInfo
@@ -53,17 +52,7 @@ class TaskRouter @Inject constructor(
             ?: return log("Runtime '${configuration.runtime}' not registered for instance ${task.instanceId}", LogLevel.ERROR)
 
         val allocatedPort = portAllocator.allocate(configuration.availablePorts)
-        if (allocatedPort == null) {
-            // No port available: do NOT leave the instance stuck in CREATING. Move it to
-            // OFFLINE so it stops counting as active and the enforcer retries it shortly.
-            log(
-                "No available ports for instance ${task.instanceId} in range " +
-                "${configuration.availablePorts.min}-${configuration.availablePorts.max}; marking OFFLINE for retry",
-                LogLevel.ERROR
-            )
-            clusterStateService.updateInstanceState(task.instanceId, InstanceState.OFFLINE)
-            return
-        }
+            ?: return log("No available ports for instance ${task.instanceId} in range ${configuration.availablePorts.min}-${configuration.availablePorts.max}", LogLevel.ERROR)
 
         val workingDir = if (configuration.static) {
             Paths.get("./static/${configuration.name}").toAbsolutePath().normalize()
@@ -255,9 +244,8 @@ class TaskRouter @Inject constructor(
         log("Routing shutdown task — stopping all local instances and exiting")
 
         // Stop all instances assigned to this node
-        val localStableNodeId = hazelcastInstance.cluster.localMember.stableNodeId()
         val localInstances = clusterStateService.getAllInstances()
-            .filter { it.wrapperNodeId == localStableNodeId }
+            .filter { it.wrapperNodeId == hazelcastInstance.cluster.localMember.uuid.toString() }
             .filter { it.state == InstanceState.ONLINE || it.state == InstanceState.CREATING }
 
         localInstances.forEach { instance ->

@@ -47,7 +47,3 @@ bin/
 
 .built/
 .tmp/
-
-### Agent / local-only ###
-.claude/
-docs/

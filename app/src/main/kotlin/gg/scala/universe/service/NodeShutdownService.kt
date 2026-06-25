@@ -6,7 +6,6 @@ import com.hazelcast.core.HazelcastInstance
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
-import gg.scala.universe.hz.stableNodeId
 import gg.scala.universe.runtime.PortAllocator
 import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.schema.InstanceState
@@ -35,7 +34,7 @@ class NodeShutdownService @Inject constructor(
      */
     fun stopAllLocalInstances() {
         val localNodeId = try {
-            hazelcastInstance.cluster.localMember.stableNodeId()
+            hazelcastInstance.cluster.localMember.uuid.toString()
         } catch (_: com.hazelcast.core.HazelcastInstanceNotActiveException) {
             log("Hazelcast already shut down, skipping local instance cleanup")
             return

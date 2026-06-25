@@ -6,7 +6,7 @@ package gg.scala.universe.k8s
 data class K8sConfig(
     val factoryName: String = "kube",
     val namespace: String = "default",
-    val image: String = "azul-zulu:21-jdk-alpine",
+    val image: String = "azul-zulu:25-jdk-alpine",
     val imagePullPolicy: String = "IfNotPresent",
     val workingDir: String = "/app",
     val restartPolicy: String = "Never",
@@ -21,12 +21,6 @@ data class K8sConfig(
     val kubeConfigPath: String? = null,
     val masterUrl: String? = null,
     val timeoutSeconds: Int = 30,
-
-    /**
-     * How long a pod may stay un-ready/pending during reconciliation before it is treated
-     * as dead and cleaned up. Kept generous so slow image pulls aren't killed prematurely.
-     */
-    val pendingGraceSeconds: Int = 120,
     /**
      * Host filesystem path that corresponds to the Universe data directory.
      * Required when Universe itself runs inside a Docker container, because

@@ -178,7 +178,7 @@ spec:
       serviceAccountName: universe
       containers:
         - name: universe
-          image: ghcr.io/universeclouddev/universe:latest
+          image: git.lunarlabs.dev/scala/universe:latest
           ports:
             - containerPort: 6000
             - containerPort: 7000

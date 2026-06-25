@@ -6,7 +6,6 @@ import com.hazelcast.core.HazelcastInstance
 import gg.scala.universe.console.LogLevel
 import gg.scala.universe.console.log
 import gg.scala.universe.hz.ClusterStateService
-import gg.scala.universe.hz.stableNodeId
 import gg.scala.universe.runtime.PortAllocator
 import gg.scala.universe.runtime.RuntimeRegistry
 import gg.scala.universe.schema.InstanceInfo
@@ -36,7 +35,7 @@ class InstanceRecoveryService @Inject constructor(
 ) {
 
     fun recover() {
-        val localNodeId = hazelcastInstance.cluster.localMember.stableNodeId()
+        val localNodeId = hazelcastInstance.cluster.localMember.uuid.toString()
         log("Recovering instances for node $localNodeId...")
 
         val recovered = mutableSetOf<String>()
@@ -106,86 +105,6 @@ class InstanceRecoveryService @Inject constructor(
             log("No instances to recover")
         } else {
             log("Recovered ${recovered.size} instance(s): ${recovered.joinToString(", ")}", LogLevel.SUCCESS)
-        }
-
-        // Reconcile each runtime's actual resources against what Universe tracks. This deletes
-        // post-restart zombie pods/services that would otherwise hold ports and node resources.
-        // It runs before the enforcer starts spawning, so we never spawn into a dirty cluster.
-        reconcileRuntimes()
-    }
-
-    /**
-     * Asks every runtime to reconcile its live resources against the instances Universe still
-     * tracks, then reacts to the report: tracked instances whose resource was dead are marked
-     * OFFLINE and have their port and node resources released.
-     */
-    private fun reconcileRuntimes() {
-        val trackedIds = clusterStateService.getAllInstances()
-            .filter { it.state == InstanceState.ONLINE || it.state == InstanceState.CREATING }
-            .map { it.id }
-            .toSet()
-
-        for ((runtimeKey, provider) in runtimeRegistry.getAll()) {
-            val report = try {
-                provider.reconcile(trackedIds)
-            } catch (e: Exception) {
-                log("Reconcile failed for runtime '$runtimeKey': ${e.message}", LogLevel.WARNING)
-                continue
-            }
-
-            if (report.deletedOrphanCount > 0 || report.deletedDeadCount > 0) {
-                log(
-                    "Runtime '$runtimeKey' reconciled: ${report.adopted.size} running, " +
-                    "${report.deletedOrphanCount} orphan(s) and ${report.deletedDeadCount} dead resource(s) deleted",
-                    LogLevel.WARNING
-                )
-            }
-
-            // Re-register healthy resources Universe lost track of (e.g. after a restart) so the
-            // enforcer treats them as active instead of spawning duplicates.
-            val localNodeId = hazelcastInstance.cluster.localMember.stableNodeId()
-            for (resource in report.adopted) {
-                if (clusterStateService.getInstance(resource.instanceId) != null) continue
-                val config = resource.configurationName?.let { clusterStateService.getConfiguration(it) }
-                if (config == null) {
-                    log(
-                        "Reconcile: running '$runtimeKey' instance ${resource.instanceId} has unknown config " +
-                        "'${resource.configurationName}'; leaving it running but untracked",
-                        LogLevel.WARNING
-                    )
-                    continue
-                }
-                if (resource.port > 0) portAllocator.reserve(resource.port)
-                clusterStateService.putInstance(
-                    InstanceInfo(
-                        id = resource.instanceId,
-                        configurationName = config.name,
-                        wrapperNodeId = localNodeId,
-                        hostAddress = resource.hostAddress.ifBlank { config.hostAddress },
-                        allocatedPort = resource.port,
-                        state = InstanceState.ONLINE,
-                        lastHeartbeat = System.currentTimeMillis(),
-                        processPid = null,
-                        allocatedRamMB = config.ramMB,
-                        allocatedCpu = config.cpu,
-                        runtime = config.runtime
-                    )
-                )
-                clusterStateService.addNodeResources(localNodeId, config.ramMB, config.cpu)
-                log(
-                    "Reconcile: re-registered running instance ${resource.instanceId} " +
-                    "(config=${config.name}, port=${resource.port})",
-                    LogLevel.SUCCESS
-                )
-            }
-
-            for (id in report.deadInstanceIds) {
-                val instance = clusterStateService.getInstance(id) ?: continue
-                portAllocator.release(instance.allocatedPort)
-                clusterStateService.removeNodeResources(instance.wrapperNodeId, instance.allocatedRamMB, instance.allocatedCpu)
-                clusterStateService.updateInstanceState(id, InstanceState.OFFLINE)
-                log("Instance $id had a dead resource during reconcile; marked OFFLINE and released port ${instance.allocatedPort}", LogLevel.WARNING)
-            }
         }
     }
 
