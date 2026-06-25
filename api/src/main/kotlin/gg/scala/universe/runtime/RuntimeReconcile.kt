@@ -1,11 +1,11 @@
 package gg.scala.universe.runtime
 
 /**
- * Pure, runtime-agnostic model for reconciling a managed resource (e.g. a Kubernetes
- * Pod) against Universe's desired state.
+ * Pure, runtime-agnostic model for reconciling a runtime's managed resources against
+ * Universe's desired state.
  *
- * The decision logic lives here, free of any Kubernetes/Hazelcast dependency, so it can
- * be unit-tested in isolation. Runtime providers build a [ResourceSnapshot] from their
+ * The decision logic lives here, free of any runtime/Hazelcast dependency, so it can be
+ * unit-tested in isolation. Runtime providers build a [ResourceSnapshot] from their
  * native objects and act on the returned [ReconcileAction].
  *
  * @author Luna
@@ -28,10 +28,10 @@ enum class ReconcileAction {
 /**
  * A minimal, native-type-free view of a managed resource needed to classify it.
  *
- * @param instanceId The `universe-instance-id` label, or null if the resource carries none.
- * @param phase The runtime phase (Kubernetes pod phase: Running/Pending/Failed/Succeeded/Unknown), or null if unknown.
- * @param ready Whether the resource reports itself ready (Kubernetes pod Ready condition).
- * @param terminating Whether the resource is already being deleted (has a deletionTimestamp).
+ * @param instanceId The Universe instance id this resource is labelled with, or null if it carries none.
+ * @param phase The runtime lifecycle phase (e.g. Running / Pending / Failed / Succeeded / Unknown), or null if unknown.
+ * @param ready Whether the resource reports itself ready.
+ * @param terminating Whether the resource is already being deleted.
  * @param ageMs How long the resource has existed, in milliseconds.
  */
 data class ResourceSnapshot(

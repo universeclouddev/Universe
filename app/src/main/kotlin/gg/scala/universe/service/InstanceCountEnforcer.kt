@@ -65,7 +65,7 @@ class InstanceCountEnforcer @Inject constructor(
             val initialInstances = clusterStateService.getAllInstances()
 
             // Watchdog: reap instances stuck in CREATING (lost deploy task, port that never
-            // freed, pod that never became ready) so they stop counting as active and can be
+            // freed, resource that never became ready) so they stop counting as active and can be
             // retried on this very tick.
             val stuck = InstanceLifecyclePolicy.staleCreating(
                 initialInstances, System.currentTimeMillis(), InstanceLifecyclePolicy.CREATING_TIMEOUT_MS

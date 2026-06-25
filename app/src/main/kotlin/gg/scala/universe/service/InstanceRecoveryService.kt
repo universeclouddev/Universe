@@ -109,7 +109,7 @@ class InstanceRecoveryService @Inject constructor(
         }
 
         // Reconcile each runtime's actual resources against what Universe tracks. This deletes
-        // post-restart zombie pods/services that would otherwise hold ports and node resources.
+        // post-restart orphaned resources that would otherwise hold ports and node capacity.
         // It runs before the enforcer starts spawning, so we never spawn into a dirty cluster.
         reconcileRuntimes()
     }

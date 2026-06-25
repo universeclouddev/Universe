@@ -84,7 +84,7 @@ class PortAllocator @Inject constructor(
 
     /**
      * Explains why a range could not be satisfied — naming the owner of each port and
-     * whether it is a live Universe instance or an unowned binding (a likely leftover pod).
+     * whether it is a live Universe instance or an unowned binding (a likely leftover resource).
      * Especially important for fixed single-port ranges, which otherwise fail opaquely.
      */
     private fun logRangeExhausted(range: PortRange, instances: Collection<InstanceInfo>) {
@@ -97,7 +97,7 @@ class PortAllocator @Inject constructor(
                 owner != null ->
                     log("  port $port: owned by instance ${owner.id} (config=${owner.configurationName}, state=${owner.state})", LogLevel.WARNING)
                 else ->
-                    log("  port $port: bound on this host with no Universe owner — likely a leftover pod/process", LogLevel.WARNING)
+                    log("  port $port: bound on this host with no Universe owner — likely a leftover resource/process", LogLevel.WARNING)
             }
         }
     }

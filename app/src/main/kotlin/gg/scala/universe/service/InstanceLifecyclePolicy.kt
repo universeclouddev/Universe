@@ -21,7 +21,7 @@ object InstanceLifecyclePolicy {
     /**
      * Returns the instances that have been stuck in [InstanceState.CREATING] for longer
      * than [timeoutMs] (measured from their last heartbeat). These are deploys that never
-     * completed — a lost task, a port that never freed, or a pod that never became ready —
+     * completed — a lost task, a port that never freed, or a resource that never became ready —
      * and must be transitioned out of CREATING so they stop counting as "active" and can
      * be retried.
      */
